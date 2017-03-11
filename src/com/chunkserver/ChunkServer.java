@@ -51,7 +51,7 @@ public class ChunkServer implements ChunkServerInterface {
 			return false;
 		}
 		try {
-			RandomAccessFile file = new RandomAccessFile(filePath + ChunkHandle, "w");
+			RandomAccessFile file = new RandomAccessFile(filePath + ChunkHandle, "rw");
 			file.write(payload, offset, payload.length);
 		} catch (FileNotFoundException e) {
 			System.out.println("Invalid chunk name " + ChunkHandle);
