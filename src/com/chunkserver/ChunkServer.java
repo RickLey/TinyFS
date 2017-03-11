@@ -58,6 +58,7 @@ public class ChunkServer implements ChunkServerInterface {
 			return false;
 		} catch (IOException e) {
 			e.printStackTrace();
+			return false;
 		}
 		return true;
 		// Open the random access file
@@ -69,9 +70,19 @@ public class ChunkServer implements ChunkServerInterface {
 	 * read the chunk at the specific offset
 	 */
 	public byte[] readChunk(String ChunkHandle, int offset, int NumberOfBytes) {
-		System.out.println("readChunk invoked:  Part 1 of TinyFS must implement the body of this method.");
-		System.out.println("Returns null for now.\n");
-		return null;
+		try {
+			RandomAccessFile file = new RandomAccessFile(filePath + ChunkHandle, "r");
+			byte[] data = new byte[NumberOfBytes];
+			file.read(data, offset, NumberOfBytes);
+			return data;
+		} catch (FileNotFoundException e) {
+			System.out.println("Invalid chunk name" + ChunkHandle);
+			return null;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null;
+		}
 		// Open the random access file
 		// Allocate array that is Number of Bytes
 		// start at offset and go to offset + NumberOfBytes setting values in the array
