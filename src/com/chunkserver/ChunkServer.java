@@ -6,7 +6,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Arrays;
-//import java.util.Arrays;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 
 import com.interfaces.ChunkServerInterface;
@@ -35,6 +37,11 @@ public class ChunkServer implements ChunkServerInterface {
 	 */
 	public String createChunk() {
 		String filename = Long.toString(counter) + ".chunk";
+		Path path = Paths.get(filename);
+		while(Files.exists(path))
+		{
+			counter += 1;
+		}
 		File file = new File(filePath + filename);
 		counter += 1;
 		
@@ -46,13 +53,14 @@ public class ChunkServer implements ChunkServerInterface {
 	 * The byte array size should be no greater than 4KB
 	 */
 	public boolean writeChunk(String ChunkHandle, byte[] payload, int offset) {
-		if(payload.length > 4* 1024)
-		{
-			return false;
-		}
-		try {
-			RandomAccessFile file = new RandomAccessFile(filePath + ChunkHandle, "rw");
-			file.write(payload, offset, payload.length);
+		try (RandomAccessFile file = new RandomAccessFile(filePath + ChunkHandle, "rw")) {
+			if(payload.length + offset > 4* 1024)
+			{
+				return false;
+			}
+			file.seek(offset);
+			file.write(payload, 0, payload.length);
+			file.close();
 		} catch (FileNotFoundException e) {
 			System.out.println("Invalid chunk name " + ChunkHandle);
 			return false;
@@ -70,10 +78,11 @@ public class ChunkServer implements ChunkServerInterface {
 	 * read the chunk at the specific offset
 	 */
 	public byte[] readChunk(String ChunkHandle, int offset, int NumberOfBytes) {
-		try {
-			RandomAccessFile file = new RandomAccessFile(filePath + ChunkHandle, "r");
+		try (RandomAccessFile file = new RandomAccessFile(filePath + ChunkHandle, "r")){
 			byte[] data = new byte[NumberOfBytes];
-			file.read(data, offset, NumberOfBytes);
+			file.seek(offset);
+			file.read(data, 0, NumberOfBytes);
+			file.close();
 			return data;
 		} catch (FileNotFoundException e) {
 			System.out.println("Invalid chunk name" + ChunkHandle);
