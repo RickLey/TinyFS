@@ -4,12 +4,15 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.util.Arrays;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 
 import com.interfaces.ChunkServerInterface;
 
@@ -27,8 +30,35 @@ public class ChunkServer implements ChunkServerInterface {
 	 * Initialize the chunk server
 	 */
 	public ChunkServer(){
-		System.out.println("Constructor of ChunkServer is invoked:  Part 1 of TinyFS must implement the body of this method.");
-		System.out.println("It does nothing for now.\n");
+		try {
+			ServerSocket listener = new ServerSocket();
+			listener.bind(new InetSocketAddress("localhost", 8080));
+			while(true)
+			{
+				Socket socket = listener.accept();
+				InputStream is = socket.getInputStream();
+				int opId = is.read(); // Make sure that the method blocks until data is available.
+				if(opId == 1)
+				{
+					// read args, call function, and return
+				}
+				else if(opId == 2)
+				{
+					
+				}
+				else if(opId == 3)
+				{
+					
+				}
+				else
+				{
+					
+				}
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	/**

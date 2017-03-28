@@ -18,14 +18,12 @@ import com.interfaces.ClientInterface;
  *
  */
 public class Client implements ClientInterface {
-	public static ChunkServer cs = new ChunkServer();
 	
 	/**
 	 * Initialize the client
 	 */
 	public Client(){
-		if (cs == null)
-			cs = new ChunkServer();
+		
 	}
 	
 	/**
@@ -39,6 +37,7 @@ public class Client implements ClientInterface {
 	 * Write a chunk at the chunk server from the client side.
 	 */
 	public boolean writeChunk(String ChunkHandle, byte[] payload, int offset) {
+		// Read the first four bytes to get the size then keep reading until you get 1k total
 		if(offset + payload.length > ChunkServer.ChunkSize){
 			System.out.println("The chunk write should be within the range of the file, invalide chunk write!");
 			return false;
