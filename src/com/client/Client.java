@@ -23,31 +23,38 @@ public class Client implements ClientInterface {
 	
 	private Socket socket;
 	
+	
+	public static byte[] intToBytes(int input)
+	{
+		ByteBuffer dbuf = ByteBuffer.allocate(4);
+		dbuf.putInt(input);
+		return dbuf.array();
+	}
 	/**
 	 * Initialize the client
 	 */
 	public Client(){
-		try {
-			socket = new Socket("localhost", 8080);
-			OutputStream os = socket.getOutputStream();
-			os.write(2);
-			ByteBuffer dbuf = ByteBuffer.allocate(4);
-			dbuf.putInt(12);
-			os.write(dbuf.array(), 0, 4);
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+
 	}
 	
 	/**
 	 * Create a chunk at the chunk server from the client side.
 	 */
 	public String createChunk() {
-		return null;
+		try {
+			socket = new Socket("localhost", 8080);
+			InputStream is = socket.getInputStream();
+			OutputStream os = socket.getOutputStream();
+			os.write(1);
+			int handleLength = ChunkServer.readInt(is);
+			String handle = new String(ChunkServer.readAmount(is, handleLength));
+			System.out.println("Client received handle " + handle);
+			return handle;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null;
+		}
 	}
 	
 	/**
@@ -59,7 +66,30 @@ public class Client implements ClientInterface {
 			System.out.println("The chunk write should be within the range of the file, invalide chunk write!");
 			return false;
 		}
-		return true;
+		OutputStream os;
+		InputStream is;
+		try {
+			socket = new Socket("localhost", 8080);
+			os = socket.getOutputStream();
+			is = socket.getInputStream();
+			os.write(2);
+			
+			ByteBuffer dbuf = ByteBuffer.allocate(4);
+			dbuf.putInt(ChunkHandle.length());
+			os.write(dbuf.array());
+			
+			//os.write(intToBytes(ChunkHandle.length()));
+			os.write(ChunkHandle.getBytes());
+			os.write(intToBytes(payload.length));
+			os.write(payload);
+			os.write(intToBytes(offset));
+			System.out.println("Completed Write chunk");
+			return is.read() == 1;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return false;
+		}
 	}
 	
 	/**

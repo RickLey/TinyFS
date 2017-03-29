@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.Arrays;
 import java.nio.ByteBuffer;
@@ -15,6 +16,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+import com.client.Client;
 import com.interfaces.ChunkServerInterface;
 
 /**
@@ -27,13 +29,19 @@ public class ChunkServer implements ChunkServerInterface {
 	final static String filePath = "C:\\Users\\fley\\Documents\\TinyFS\\csci485Disk\\";	//or C:\\newfile.txt
 	public static long counter = 0;
 	
-	private int readInt(InputStream is)
+	public static int readInt(InputStream is)
 	{
 		byte[] buffer = readAmount(is, 4);
 		return ByteBuffer.wrap(buffer).getInt();
 	}
 	
-	private byte[] readAmount(InputStream is, int amount)
+	public static String readString (InputStream is, int length)
+	{
+		byte[] buffer = readAmount(is, length);
+		return new String(buffer);
+	}
+	
+	public static byte[] readAmount(InputStream is, int amount)
 	{
 		int readCount = 0;
 		byte[] buffer = new byte[amount];
@@ -60,17 +68,40 @@ public class ChunkServer implements ChunkServerInterface {
 			{
 				Socket socket = listener.accept();
 				InputStream is = socket.getInputStream();
+				OutputStream os = socket.getOutputStream();
 				int opId = is.read(); // Make sure that the method blocks until data is available.
 				System.out.println("ChunkServer");
 				System.out.println(opId);
 				if(opId == 1)
 				{
-					// read args, call function, and return
+					String handle = createChunk();
+					os.write(Client.intToBytes(handle.length()));
+					os.write(handle.getBytes());
+					socket.close();
 				}
 				else if(opId == 2)
 				{
 					int strLen = readInt(is);
 					System.out.println(strLen);
+					String handle = readString(is, strLen);
+					System.out.println(handle);
+					
+					int payloadLen = readInt(is);
+					System.out.println(payloadLen);
+					byte[] payload = readAmount(is, payloadLen);
+					System.out.println(payload[3]);
+					
+					int offset = readInt(is);
+					System.out.println(offset);
+					
+					boolean result = writeChunk(handle, payload, offset);
+					
+					if(result)
+						os.write(1);
+					else
+						os.write(0);
+					
+					socket.close();
 					
 				}
 				else if(opId == 3)
