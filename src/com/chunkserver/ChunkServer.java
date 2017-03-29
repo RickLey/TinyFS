@@ -106,7 +106,22 @@ public class ChunkServer implements ChunkServerInterface {
 				}
 				else if(opId == 3)
 				{
+					int strLen = readInt(is);
+					System.out.println(strLen);
+					String handle = readString(is, strLen);
+					System.out.println(handle);
 					
+					int offset = readInt(is);
+					
+					int numberOfBytes = readInt(is);
+					System.out.println(offset);
+					System.out.println(numberOfBytes);
+					
+					byte[] result = readChunk(handle, offset, numberOfBytes);
+					
+					os.write(Client.intToBytes(result.length));
+					os.write(result);
+					socket.close();
 				}
 				else
 				{

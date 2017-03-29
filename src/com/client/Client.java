@@ -74,9 +74,9 @@ public class Client implements ClientInterface {
 			is = socket.getInputStream();
 			os.write(2);
 			
-			ByteBuffer dbuf = ByteBuffer.allocate(4);
-			dbuf.putInt(ChunkHandle.length());
-			os.write(dbuf.array());
+//			ByteBuffer dbuf = ByteBuffer.allocate(4);
+//			dbuf.putInt(ChunkHandle.length());
+			os.write(intToBytes(ChunkHandle.length()));
 			
 			//os.write(intToBytes(ChunkHandle.length()));
 			os.write(ChunkHandle.getBytes());
@@ -100,7 +100,34 @@ public class Client implements ClientInterface {
 			System.out.println("The chunk read should be within the range of the file, invalide chunk read!");
 			return null;
 		}
-		return null;
+		OutputStream os;
+		InputStream is;
+		
+		try {
+			socket = new Socket("localhost", 8080);
+			os = socket.getOutputStream();
+			is = socket.getInputStream();
+			os.write(3);
+			
+			os.write(intToBytes(ChunkHandle.length()));
+			os.write(ChunkHandle.getBytes());
+			
+			os.write(intToBytes(offset));
+			os.write(intToBytes(NumberOfBytes));
+			
+			int payloadLength = ChunkServer.readInt(is);
+			byte[] payload = ChunkServer.readAmount(is, payloadLength);
+			return payload;
+			
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return null;
+		}
 	}
 
 	
