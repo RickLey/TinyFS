@@ -8,6 +8,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 
 import com.chunkserver.ChunkServer;
 import com.interfaces.ClientInterface;
@@ -19,18 +21,33 @@ import com.interfaces.ClientInterface;
  */
 public class Client implements ClientInterface {
 	
+	private Socket socket;
+	
 	/**
 	 * Initialize the client
 	 */
 	public Client(){
-		
+		try {
+			socket = new Socket("localhost", 8080);
+			OutputStream os = socket.getOutputStream();
+			os.write(2);
+			ByteBuffer dbuf = ByteBuffer.allocate(4);
+			dbuf.putInt(12);
+			os.write(dbuf.array(), 0, 4);
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	/**
 	 * Create a chunk at the chunk server from the client side.
 	 */
 	public String createChunk() {
-		return cs.createChunk();
+		return null;
 	}
 	
 	/**
@@ -42,7 +59,7 @@ public class Client implements ClientInterface {
 			System.out.println("The chunk write should be within the range of the file, invalide chunk write!");
 			return false;
 		}
-		return cs.writeChunk(ChunkHandle, payload, offset);
+		return true;
 	}
 	
 	/**
@@ -53,7 +70,7 @@ public class Client implements ClientInterface {
 			System.out.println("The chunk read should be within the range of the file, invalide chunk read!");
 			return null;
 		}
-		return cs.readChunk(ChunkHandle, offset, NumberOfBytes);
+		return null;
 	}
 
 	

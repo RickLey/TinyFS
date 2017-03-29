@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.util.Arrays;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,6 +27,28 @@ public class ChunkServer implements ChunkServerInterface {
 	final static String filePath = "C:\\Users\\fley\\Documents\\TinyFS\\csci485Disk\\";	//or C:\\newfile.txt
 	public static long counter = 0;
 	
+	private int readInt(InputStream is)
+	{
+		byte[] buffer = readAmount(is, 4);
+		return ByteBuffer.wrap(buffer).getInt();
+	}
+	
+	private byte[] readAmount(InputStream is, int amount)
+	{
+		int readCount = 0;
+		byte[] buffer = new byte[amount];
+		while(readCount < amount)
+		{
+			try {
+				readCount += is.read(buffer, readCount, amount - readCount);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		return buffer;
+	}
+	
 	/**
 	 * Initialize the chunk server
 	 */
@@ -38,12 +61,16 @@ public class ChunkServer implements ChunkServerInterface {
 				Socket socket = listener.accept();
 				InputStream is = socket.getInputStream();
 				int opId = is.read(); // Make sure that the method blocks until data is available.
+				System.out.println("ChunkServer");
+				System.out.println(opId);
 				if(opId == 1)
 				{
 					// read args, call function, and return
 				}
 				else if(opId == 2)
 				{
+					int strLen = readInt(is);
+					System.out.println(strLen);
 					
 				}
 				else if(opId == 3)
@@ -54,6 +81,7 @@ public class ChunkServer implements ChunkServerInterface {
 				{
 					
 				}
+				//socket.close();
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -129,5 +157,10 @@ public class ChunkServer implements ChunkServerInterface {
 	}
 	
 	
+	public static void main(String args[])
+	{
+		ChunkServer cs = new ChunkServer();
+	}
 
 }
+
