@@ -4,7 +4,7 @@ import java.io.File;
 
 /**
  * Interfaces of the CSCI 485 TinyFS ChunkServer
- * @author Shahram Ghandeharizadeh
+ * @author Shahram Ghandeharizaden and Jason Gui
  *
  */
 public interface ChunkServerInterface {

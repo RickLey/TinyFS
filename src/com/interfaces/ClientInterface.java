@@ -5,7 +5,7 @@ import java.util.HashMap;
 
 /**
  * Interfaces of the TinyFS Client 
- * @author Shahram Ghandeharizadeh
+ * @author Shahram Ghandeharizadeh and Jason Gui
  *
  */
 public interface ClientInterface {
