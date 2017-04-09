@@ -61,6 +61,7 @@ public class ClientFS {
 	 * Example usage: ListDir("/Shahram/CSCI485")
 	 */
 	public String[] ListDir(String tgt) {
+		// Iterate through ordered list until there's a prefix that is not the target dir
 		return null;
 	}
 
@@ -72,6 +73,10 @@ public class ClientFS {
 	 * Example usage: Createfile("/Shahram/CSCI485/Lecture1/", "Intro.pptx")
 	 */
 	public FSReturnVals CreateFile(String tgtdir, String filename) {
+		// Send message to master
+		// Master will insert filename into ordered list
+		
+		// Files are handled the same as directories. All directories end with a /
 		return null;
 	}
 
@@ -94,6 +99,7 @@ public class ClientFS {
 	 * Example usage: OpenFile("/Shahram/CSCI485/Lecture1/Intro.pptx", FH1)
 	 */
 	public FSReturnVals OpenFile(String FilePath, FileHandle ofh) {
+		// Return the FilePath as a file handle. Vacuous.
 		return null;
 	}
 
