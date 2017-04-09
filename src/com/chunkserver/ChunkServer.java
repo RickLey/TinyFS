@@ -41,6 +41,11 @@ public class ChunkServer implements ChunkServerInterface {
 	public static final int TRUE = 1;
 	public static final int FALSE = 0;
 	
+	/*
+	 * Avilable size for records is MAX_CHUNKSIZE - 3 because of metadata (2 bytes for length of record and 1 byte for (in)valid)
+	 */
+	
+	
 	/**
 	 * Initialize the chunk server
 	 */
@@ -59,6 +64,7 @@ public class ChunkServer implements ChunkServerInterface {
 			counter = cntrs[cntrs.length - 1];
 		}
 	}
+	
 	
 	/**
 	 * Each chunk is corresponding to a file.
