@@ -2,10 +2,19 @@ package com.client;
 
 import java.nio.ByteBuffer;
 
+import com.chunkserver.ChunkServer;
 import com.client.ClientFS.FSReturnVals;
+import com.master.Master;
 
 public class ClientRec {
 
+	//Create a master instance!
+	//Passing (1, "") in arguments for part one ONLY. that will change with networking.
+	Master master = new Master(1, "");
+	
+	// CHANGE TO master.chunkServer();
+	ChunkServer cs = new ChunkServer();
+	
 	/**
 	 * Appends a record to the open file as specified by ofh Returns BadHandle
 	 * if ofh is invalid Returns BadRecID if the specified RID is not null
@@ -13,11 +22,23 @@ public class ClientRec {
 	 * null if AppendRecord fails
 	 *
 	 * Example usage: AppendRecord(FH1, obama, RecID1)
-	 */
+	 */	
 	public FSReturnVals AppendRecord(FileHandle ofh, byte[] payload, RID RecordID) {
-		// Check if payload exceeds chunk size
-		// Contact master to send file handle and length of payload
-		// Master returns chunk handle of last chunk
+				
+		if(RecordID != null){
+			return ClientFS.FSReturnVals.BadRecID;
+		}
+		
+		//Check length of the payload with the chunk size
+		short length = (short) payload.length;
+		if(length > ChunkServer.ChunkSize){
+			return ClientFS.FSReturnVals.RecordTooLong;
+		}
+		
+		//Check file handle with master
+		//String chunkHandle = master.validateFileHandle();
+		
+
 		/*
 		 *  Master validates existence of file, looks up entry in map to chunk lists
 		 *  Checks remaining space in last chunk (initialized to zero for a new file).
@@ -31,8 +52,16 @@ public class ClientRec {
 		 *  Master must also send offset into chunk
 		 */
 		
+		// Master returns chunk handle of last chunk
+		
 		// Calls writeChunk with chunk handle, offset, payload. Must write
 		// The length of the record (2 bytes) right before the record itself
+		
+		
+		
+		//cs.writeChunk(ofh, );
+		
+		
 		// And a byte to indicate (in)valid
 		// Populates RID
 		// Returns returnval
