@@ -24,6 +24,7 @@ public class ClientRec {
 	 * Example usage: AppendRecord(FH1, obama, RecID1)
 	 */	
 	public FSReturnVals AppendRecord(FileHandle ofh, byte[] payload, RID RecordID) {
+
 				
 		if(RecordID != null){
 			return ClientFS.FSReturnVals.BadRecID;
@@ -49,7 +50,7 @@ public class ClientRec {
 		 *  (The master keeps an integer for remaining space on the last chunk and 
 		 *  decrements it by the size of the payload. Resets it to max size upon 
 		 *  new chunk creation.
-		 *  Master must also send offset into chunk
+		 *  Master must also send offset into chunk at which to append
 		 */
 		
 		// Master returns chunk handle of last chunk
@@ -81,7 +82,7 @@ public class ClientRec {
 	 * Example usage: DeleteRecord(FH1, RecID1)
 	 */
 	public FSReturnVals DeleteRecord(FileHandle ofh, RID RecordID) {
-		// Go to master to get the chunk of the record
+		// Go to master to validate the chunk of the record
 		// Write a 0 to the valid byte
 		return null;
 	}
@@ -139,9 +140,9 @@ public class ClientRec {
 		// If read succeeds, return
 		// Else, ask master for next chunk handle
 		// Read top record of that chunk
-		// Finally, blend record
+		// Finally, return record
 		
-		// Skip deleted records
+		// Skip deleted (invalidated) records
 		return null;
 	}
 
