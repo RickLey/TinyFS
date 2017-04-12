@@ -18,6 +18,7 @@ public class ClientRec {
 		// Check if payload exceeds chunk size
 		// Contact master to send file handle and length of payload
 		// Master returns chunk handle of last chunk
+		
 		/*
 		 *  Master validates existence of file, looks up entry in map to chunk lists
 		 *  Checks remaining space in last chunk (initialized to zero for a new file).
@@ -28,7 +29,7 @@ public class ClientRec {
 		 *  (The master keeps an integer for remaining space on the last chunk and 
 		 *  decrements it by the size of the payload. Resets it to max size upon 
 		 *  new chunk creation.
-		 *  Master must also send offset into chunk
+		 *  Master must also send offset into chunk at which to append
 		 */
 		
 		// Calls writeChunk with chunk handle, offset, payload. Must write
@@ -48,7 +49,7 @@ public class ClientRec {
 	 * Example usage: DeleteRecord(FH1, RecID1)
 	 */
 	public FSReturnVals DeleteRecord(FileHandle ofh, RID RecordID) {
-		// Go to master to get the chunk of the record
+		// Go to master to validate the chunk of the record
 		// Write a 0 to the valid byte
 		return null;
 	}
@@ -106,9 +107,9 @@ public class ClientRec {
 		// If read succeeds, return
 		// Else, ask master for next chunk handle
 		// Read top record of that chunk
-		// Finally, blend record
+		// Finally, return record
 		
-		// Skip deleted records
+		// Skip deleted (invalidated) records
 		return null;
 	}
 
