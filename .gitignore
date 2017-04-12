@@ -11,3 +11,9 @@
 hs_err_pid*
 bin/
 csci485Disk/
+
+# IntelliJ IDEA
+.idea/
+CSCI485.iml
+
+ClientConfig.txt
