@@ -107,9 +107,9 @@ public class ClientRec {
 		// If read succeeds, return
 		// Else, ask master for next chunk handle
 		// Read top record of that chunk
-		// Finally, blend record
+		// Finally, return record
 		
-		// Skip deleted records
+		// Skip deleted (invalidated) records
 		return null;
 	}
 

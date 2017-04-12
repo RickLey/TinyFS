@@ -1,5 +1,6 @@
 package com.master;
 
+import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,9 +15,10 @@ public class Master {
 	HashMap<String, String> chunkLocations; //Map from chunkHandle to chunkServer IPs
 	HashMap<String, Integer> remainingChunkSpace; // How much space is left in last chunk of a file
 	
-	ArrayList<Socket> chunkserverConnections;
-	int currChunkserver;
+	/*ArrayList<Socket> chunkserverConnections;
+	int currChunkserver;*/
 	
+	ChunkServer chunkserver;
 	//Locks
 	
 	
@@ -26,14 +28,19 @@ public class Master {
 		namespace = new ArrayList<String>();
 		chunkLists = new HashMap<String, ArrayList<String>>();
 		chunkLocations = new HashMap<String, String>();
-		currChunkserver = 0;
+		//currChunkserver = 0;
 		//Write networking
+		
+		chunkserver = new ChunkServer();
 	}
 	
-	//Verify file handle and chunk handle
+	boolean VerifyFileHandle(String fileHandle)
+	{
+		return !chunkLists.containsKey(fileHandle);
+	}
 	
 	boolean VerifyFileHandleAndChunkHandle(String fileHandle, String chunkHandle){
-		return !chunkLists.containsKey(fileHandle) ||
+		return VerifyFileHandle(fileHandle) ||
 				chunkLists.get(fileHandle).indexOf(chunkHandle) >= 0;
 	}
 	
@@ -62,21 +69,34 @@ public class Master {
 		return list.size() > 0 ? list.get(0) : null;
 	}
 	
-	String GetHandleHandleForAppend(String FileHandle, Integer payloadSize){
-		if(payloadSize < remainingChunkSpace.get(FileHandle))
+	String GetHandleForAppend(String FileHandle, Integer payloadSize){
+		int remainingSpace = remainingChunkSpace.get(FileHandle);
+		if(payloadSize < remainingSpace)
 		{
 			ArrayList<String> list = chunkLists.get(FileHandle);
+			remainingChunkSpace.put(FileHandle, remainingSpace - payloadSize);
 			return list.get(list.size() - 1);
 		}
 		else
 		{
 			// Call a chunkserver to create a chunk
 			// Rotate the chunkserver to create new chunks
-			// add the handle to the list for this file
-			// reset the remaining space to be chunksize - payloadsize
-			// payload size already validated?
-			// return chunk handle
-			return null;
+			/*Socket chunkserver = chunkserverConnections.get(currChunkserver 
+					% chunkserverConnections.size());
+			currChunkserver++;
+			try {
+				chunkserver.getOutputStream().write(ChunkServer.CreateChunkCMD);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			Read the string handle back
+			*/
+			
+			String chunkHandle = chunkserver.createChunk();
+			chunkLists.get(FileHandle).add(chunkHandle); // add the handle to the list for this file
+			remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize); // reset the remaining space to be chunksize - payloadsize
+			return chunkHandle;
 		}
 	}
 	
