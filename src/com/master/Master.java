@@ -1,19 +1,27 @@
 package com.master;
 
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.HashMap;
+
+import com.chunkserver.ChunkServer;
+import com.client.FileHandle;
 public class Master {
 	
-	//Ordered list of FileHandles(String)
-	//Map from FileHandle to list of chunkHandle's
-	//Map from chunkHandle to chunkServer
+	
+	ArrayList<String> namespace; //Ordered list of FileHandles(String)
+	HashMap<FileHandle, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
+	HashMap<String, String> chunkLocations; //Map from chunkHandle to chunkServer IPs
+	
 	//Locks
 	
-	
-	
-	//Wirte networking
+	//Write networking
 	
 	public Master(int portNumber, String hostname)
 	{
-		
+		namespace = new ArrayList<String>();
+		chunkLists = new HashMap<FileHandle, ArrayList<String>>();
+		chunkLocations = new HashMap<String, String>();
 	}
 	
 	//Verify file handle and chunk handle

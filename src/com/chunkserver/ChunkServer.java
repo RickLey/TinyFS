@@ -42,7 +42,7 @@ public class ChunkServer implements ChunkServerInterface {
 	public static final int FALSE = 0;
 	
 	/*
-	 * Avilable size for records is MAX_CHUNKSIZE - 3 because of metadata (2 bytes for length of record and 1 byte for (in)valid)
+	 * Available size for records is MAX_CHUNKSIZE - 3 because of metadata (2 bytes for length of record and 1 byte for (in)valid)
 	 */
 	
 	
