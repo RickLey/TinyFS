@@ -51,6 +51,9 @@ public class ChunkServer implements ChunkServerInterface {
 	 */
 	public ChunkServer(){
 		File dir = new File(filePath);
+		if (!dir.exists()) {
+			dir.mkdir();
+		}
 		File[] fs = dir.listFiles();
 
 		if(fs.length == 0){
