@@ -37,6 +37,10 @@ public class ClientRec {
 		// And a byte to indicate (in)valid
 		// Populates RID
 		// Returns returnval
+		
+		
+		
+		
 		return null;
 	}
 
