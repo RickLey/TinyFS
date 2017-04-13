@@ -7,6 +7,8 @@ import java.util.HashMap;
 
 import com.chunkserver.ChunkServer;
 import com.client.FileHandle;
+import com.client.ClientFS;
+import com.client.ClientFS.FSReturnVals;
 public class Master {
 
 	public static int PORT = 1234;
@@ -44,11 +46,209 @@ public class Master {
 		namespace = new ArrayList<String>();
 		chunkLists = new HashMap<String, ArrayList<String>>();
 		chunkLocations = new HashMap<String, String>();
+		namespace.add("/");
 		//currChunkserver = 0;
 		//Write networking
 		
 		chunkserver = new ChunkServer();
 	}
+	
+	/**
+	 * Creates the specified dirname in the src directory Returns
+	 * SrcDirNotExistent if the src directory does not exist Returns
+	 * DestDirExists if the specified dirname exists
+	 *
+	 * Example usage: CreateDir("/", "Shahram"), CreateDir("/Shahram/",
+	 * "CSCI485"), CreateDir("/Shahram/CSCI485/", "Lecture1")
+	 */
+	public FSReturnVals CreateDir(String src, String dirname) {
+		int parentIndex = namespace.indexOf(src);
+		if(parentIndex < 0)
+		{
+			return ClientFS.FSReturnVals.SrcDirNotExistent;
+		}
+		
+		String fullPath = src + dirname + "/";
+		if(namespace.indexOf(fullPath) >= 0)
+		{
+			return ClientFS.FSReturnVals.DestDirExists;
+		}
+		
+		int index = parentIndex;
+		while(index < namespace.size() && fullPath.compareTo(namespace.get(index)) > 0)
+		{
+			index++; // Find the index at which this subdir should be inserted
+		}
+		namespace.add(index, fullPath);
+		// No chunkLists entry because directories do not consist of chunks
+		return ClientFS.FSReturnVals.Success;
+	}
+
+	/**
+	 * Deletes the specified dirname in the src directory Returns
+	 * SrcDirNotExistent if the src directory does not exist Returns
+	 * DestDirExists if the specified dirname exists
+	 *
+	 * Example usage: DeleteDir("/Shahram/CSCI485/", "Lecture1")
+	 */
+	public FSReturnVals DeleteDir(String src, String dirname) {
+		int parentIndex = namespace.indexOf(src);
+		if(parentIndex < 0)
+		{
+			return ClientFS.FSReturnVals.SrcDirNotExistent;
+		}
+		
+		String fullPath = src + dirname + "/";
+		int dirIndex = namespace.indexOf(fullPath);
+		if(dirIndex < 0)
+		{
+			return ClientFS.FSReturnVals.Fail; // Dir doesn't exist
+		}
+		
+		if(namespace.get(dirIndex + 1).startsWith(fullPath))
+		{
+			return ClientFS.FSReturnVals.DirNotEmpty;
+		}
+		
+		namespace.remove(dirIndex);
+		return ClientFS.FSReturnVals.Success;
+	}
+
+	/**
+	 * Renames the specified src directory in the specified path to NewName
+	 * Returns SrcDirNotExistent if the src directory does not exist Returns
+	 * DestDirExists if a directory with NewName exists in the specified path
+	 *
+	 * Example usage: RenameDir("/Shahram/CSCI485", "/Shahram/CSCI550") changes
+	 * "/Shahram/CSCI485" to "/Shahram/CSCI550"
+	 */
+	public FSReturnVals RenameDir(String src, String NewName) {
+		int index = namespace.indexOf(src + "/");
+		if(index < 0)
+		{
+			return ClientFS.FSReturnVals.SrcDirNotExistent;
+		}
+		
+		if(namespace.indexOf(NewName + "/") >= 0)
+		{
+			return ClientFS.FSReturnVals.DestDirExists;
+		}
+		
+		index += 1;
+		if(index < namespace.size())
+		{
+			String temp = namespace.get(index);
+			while(temp.startsWith(src + "/"))
+			{
+				temp.replaceFirst(src, NewName);
+				index++;
+				if(index == namespace.size())
+				{
+					break;
+				}
+				temp = namespace.get(index);
+			}
+		}
+		
+		// Must sort at the end to maintain canonical order?
+		return ClientFS.FSReturnVals.Success;
+	}
+
+	/**
+	 * Lists the content of the target directory Returns SrcDirNotExistent if
+	 * the target directory does not exist Returns null if the target directory
+	 * is empty
+	 *
+	 * Example usage: ListDir("/Shahram/CSCI485")
+	 */
+	public String[] ListDir(String tgt) {
+		// Iterate through ordered list until there's a prefix that is not the target dir
+		int index = namespace.indexOf(tgt + "/");
+		if(index < 0)
+		{
+			return null;
+		}
+		
+		ArrayList<String> result = new ArrayList<String>();
+		index += 1;
+		if(index < namespace.size())
+		{
+			String temp = namespace.get(index);
+			while(temp.startsWith(tgt))
+			{
+				if(temp.endsWith("/"))
+				{
+					/* We add a '/' to the end of directory names to differentiate them from files
+					 * when checking if a directory exists. The unit tests do not expect this,
+					 * so the directory names must be trimmed
+					*/ 
+					temp = temp.substring(0, temp.length() - 1);
+				}
+				result.add(temp);
+				index++;
+				if(index == namespace.size())
+				{
+					break;
+				}
+				temp = namespace.get(index);
+			}
+
+		}
+				
+		if(result.size() == 0)
+		{
+			return null;
+		}
+		return result.toArray(new String[1]); // force the function to just create a new array
+	}
+
+	/**
+	 * Creates the specified filename in the target directory Returns
+	 * SrcDirNotExistent if the target directory does not exist Returns
+	 * FileExists if the specified filename exists in the specified directory
+	 *
+	 * Example usage: Createfile("/Shahram/CSCI485/Lecture1/", "Intro.pptx")
+	 */
+	public FSReturnVals CreateFile(String tgtdir, String filename) {
+		// Send message to master
+		// Master will insert filename into ordered list
+		
+		// Files are handled the same as directories. All directories end with a /
+		return null;
+	}
+
+	/**
+	 * Deletes the specified filename from the tgtdir Returns SrcDirNotExistent
+	 * if the target directory does not exist Returns FileDoesNotExist if the
+	 * specified filename is not-existent
+	 *
+	 * Example usage: DeleteFile("/Shahram/CSCI485/Lecture1/", "Intro.pptx")
+	 */
+	public FSReturnVals DeleteFile(String tgtdir, String filename) {
+		return null;
+	}
+
+	/**
+	 * Opens the file specified by the FilePath and populates the FileHandle
+	 * Returns FileDoesNotExist if the specified filename by FilePath is
+	 * not-existent
+	 *
+	 * Example usage: OpenFile("/Shahram/CSCI485/Lecture1/Intro.pptx", FH1)
+	 */
+	public FSReturnVals OpenFile(String FilePath, FileHandle ofh) {
+		// Return the FilePath as a file handle. Vacuous.
+		return null;
+	}
+
+	/**
+	 * Closes the specified file handle Returns BadHandle if ofh is invalid
+	 *
+	 * Example usage: CloseFile(FH1)
+	 */
+	public FSReturnVals CloseFile(FileHandle ofh) {
+		return null;
+	}
+
 	
 	boolean VerifyFileHandle(String fileHandle)
 	{

@@ -53,15 +53,18 @@ public class ClientFS {
 	private Socket socket;
 	private ObjectOutputStream outStream;
 	private ObjectInputStream inStream;
+	private Master master;
 
 	public ClientFS() {
-		try {
+		/*try {
 			socket = new Socket(Master.HOST, Master.PORT);
 			outStream = new ObjectOutputStream(socket.getOutputStream());
 			inStream = new ObjectInputStream(socket.getInputStream());
 		} catch (IOException ioe) {
 			ioe.printStackTrace();
-		}
+		}*/
+		
+		master = new Master(0, null);
 	}
 
 	/**
@@ -73,7 +76,7 @@ public class ClientFS {
 	 * "CSCI485"), CreateDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals CreateDir(String src, String dirname) {
-		return null;
+		return master.CreateDir(src, dirname);
 	}
 
 	/**
@@ -84,7 +87,7 @@ public class ClientFS {
 	 * Example usage: DeleteDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals DeleteDir(String src, String dirname) {
-		return null;
+		return  master.DeleteDir(src, dirname);
 	}
 
 	/**
@@ -96,7 +99,7 @@ public class ClientFS {
 	 * "/Shahram/CSCI485" to "/Shahram/CSCI550"
 	 */
 	public FSReturnVals RenameDir(String src, String NewName) {
-		return null;
+		return master.RenameDir(src, NewName);
 	}
 
 	/**
@@ -108,7 +111,7 @@ public class ClientFS {
 	 */
 	public String[] ListDir(String tgt) {
 		// Iterate through ordered list until there's a prefix that is not the target dir
-		return null;
+		return master.ListDir(tgt);
 	}
 
 	/**
