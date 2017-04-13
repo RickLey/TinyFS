@@ -1,21 +1,67 @@
 package com.client;
 
+import com.master.Master;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
+
 public class ClientFS {
 
+	// enum <-> int conversion as found at: http://codingexplained.com/coding/java/enum-to-integer-and-integer-to-enum
 	public enum FSReturnVals {
-		DirExists, // Returned by CreateDir when directory exists
-		DirNotEmpty, //Returned when a non-empty directory is deleted
-		SrcDirNotExistent, // Returned when source directory does not exist
-		DestDirExists, // Returned when a destination directory exists
-		FileExists, // Returned when a file exists
-		FileDoesNotExist, // Returns when a file does not exist
-		BadHandle, // Returned when the handle for an open file is not valid
-		RecordTooLong, // Returned when a record size is larger than chunk size
-		BadRecID, // The specified RID is not valid, used by DeleteRecord
-		RecDoesNotExist, // The specified record does not exist, used by DeleteRecord
-		NotImplemented, // Specific to CSCI 485 and its unit tests
-		Success, //Returned when a method succeeds
-		Fail //Returned when a method fails
+		DirExists(0), // Returned by CreateDir when directory exists
+		DirNotEmpty(1), //Returned when a non-empty directory is deleted
+		SrcDirNotExistent(2), // Returned when source directory does not exist
+		DestDirExists(3), // Returned when a destination directory exists
+		FileExists(4), // Returned when a file exists
+		FileDoesNotExist(5), // Returns when a file does not exist
+		BadHandle(6), // Returned when the handle for an open file is not valid
+		RecordTooLong(7), // Returned when a record size is larger than chunk size
+		BadRecID(8), // The specified RID is not valid, used by DeleteRecord
+		RecDoesNotExist(9), // The specified record does not exist, used by DeleteRecord
+		NotImplemented(10), // Specific to CSCI 485 and its unit tests
+		Success(11), //Returned when a method succeeds
+		Fail(12); //Returned when a method fails
+
+		private int value;
+
+		FSReturnVals(int value) {
+			this.value = value;
+		}
+
+		public int getValue() {
+			return this.value;
+		}
+
+		private static Map<Integer, FSReturnVals> valueMap = new HashMap<Integer, FSReturnVals>();
+
+		static {
+			for (FSReturnVals returnVal : FSReturnVals.values()) {
+				valueMap.put(returnVal.value, returnVal);
+			}
+		}
+
+		public static FSReturnVals valueOf(int value) {
+			return valueMap.get(value);
+		}
+	}
+
+	private Socket socket;
+	private ObjectOutputStream outStream;
+	private ObjectInputStream inStream;
+
+	public ClientFS() {
+		try {
+			socket = new Socket(Master.HOST, Master.PORT);
+			outStream = new ObjectOutputStream(socket.getOutputStream());
+			inStream = new ObjectInputStream(socket.getInputStream());
+		} catch (IOException ioe) {
+			ioe.printStackTrace();
+		}
 	}
 
 	/**
