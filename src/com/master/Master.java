@@ -134,23 +134,33 @@ public class Master {
 			return ClientFS.FSReturnVals.DestDirExists;
 		}
 		
-		index += 1;
-		if(index < namespace.size())
+		String temp = namespace.get(index);
+		while(temp.startsWith(src + "/"))
 		{
-			String temp = namespace.get(index);
-			while(temp.startsWith(src + "/"))
+			String renamed = temp.replaceFirst(src, NewName);
+			namespace.remove(index);
+			namespace.add(index, renamed);
+			ArrayList<String> list = chunkLists.get(temp);
+			if(list != null) // Only for files, not directories
 			{
-				temp.replaceFirst(src, NewName);
-				index++;
-				if(index == namespace.size())
-				{
-					break;
-				}
-				temp = namespace.get(index);
+				chunkLists.remove(temp);
+				chunkLists.put(renamed, list);
+				
+				int space = remainingChunkSpace.get(temp); // Because the entry exists in ChunkLists, it will exist here
+				remainingChunkSpace.remove(temp);
+				remainingChunkSpace.put(renamed, space);
 			}
+			
+			index++;
+			if(index == namespace.size())
+			{
+				break;
+			}
+			temp = namespace.get(index);
 		}
 		
-		// Must sort at the end to maintain canonical order?
+		// Must sort at the end to maintain canonical order? -- shouldn't be necessary
+		// as they will all still be clustered
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -212,9 +222,27 @@ public class Master {
 	public FSReturnVals CreateFile(String tgtdir, String filename) {
 		// Send message to master
 		// Master will insert filename into ordered list
+		int parentIndex = namespace.indexOf(tgtdir);
+		if(parentIndex < 0)
+		{
+			return ClientFS.FSReturnVals.SrcDirNotExistent;
+		}
+		String fullPath = tgtdir + filename;
+		if(namespace.indexOf(fullPath) >= 0)
+		{
+			return ClientFS.FSReturnVals.FileExists;
+		}
 		
+		int index = parentIndex;
+		while(index < namespace.size() && fullPath.compareTo(namespace.get(index)) > 0)
+		{
+			index++; // Find the index at which this file should be inserted
+		}
+		namespace.add(index, fullPath);
+		chunkLists.put(fullPath, new ArrayList<String>());
+		remainingChunkSpace.put(fullPath, 0); // Because no chunk allocated yet.
 		// Files are handled the same as directories. All directories end with a /
-		return null;
+		return ClientFS.FSReturnVals.Success;
 	}
 
 	/**
@@ -225,7 +253,31 @@ public class Master {
 	 * Example usage: DeleteFile("/Shahram/CSCI485/Lecture1/", "Intro.pptx")
 	 */
 	public FSReturnVals DeleteFile(String tgtdir, String filename) {
-		return null;
+		int parentIndex = namespace.indexOf(tgtdir);
+		if(parentIndex < 0)
+		{
+			return ClientFS.FSReturnVals.SrcDirNotExistent;
+		}
+		
+		String fullPath = tgtdir + filename;
+		int index = namespace.indexOf(fullPath);
+		if(index < 0)
+		{
+			return ClientFS.FSReturnVals.FileDoesNotExist;
+		}
+		
+		namespace.remove(index);
+		ArrayList<String> chunkList = chunkLists.get(fullPath);
+		for(String chunk : chunkList)
+		{
+			chunkLocations.remove(chunk);
+		}
+		chunkLists.remove(fullPath);
+		remainingChunkSpace.remove(fullPath);
+		
+		// Tell chunkservers to delete those files?
+		
+		return ClientFS.FSReturnVals.Success;
 	}
 
 	/**
