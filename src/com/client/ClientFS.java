@@ -126,7 +126,7 @@ public class ClientFS {
 		// Master will insert filename into ordered list
 		
 		// Files are handled the same as directories. All directories end with a /
-		return null;
+		return master.CreateFile(tgtdir, filename);
 	}
 
 	/**
@@ -137,7 +137,7 @@ public class ClientFS {
 	 * Example usage: DeleteFile("/Shahram/CSCI485/Lecture1/", "Intro.pptx")
 	 */
 	public FSReturnVals DeleteFile(String tgtdir, String filename) {
-		return null;
+		return master.DeleteFile(tgtdir, filename);
 	}
 
 	/**
@@ -149,7 +149,7 @@ public class ClientFS {
 	 */
 	public FSReturnVals OpenFile(String FilePath, FileHandle ofh) {
 		// Return the FilePath as a file handle. Vacuous.
-		return null;
+		return master.OpenFile(FilePath, ofh);
 	}
 
 	/**
@@ -158,7 +158,7 @@ public class ClientFS {
 	 * Example usage: CloseFile(FH1)
 	 */
 	public FSReturnVals CloseFile(FileHandle ofh) {
-		return null;
+		return master.CloseFile(ofh);
 	}
 
 }

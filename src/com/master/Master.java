@@ -46,6 +46,7 @@ public class Master {
 		namespace = new ArrayList<String>();
 		chunkLists = new HashMap<String, ArrayList<String>>();
 		chunkLocations = new HashMap<String, String>();
+		remainingChunkSpace = new HashMap<String, Integer>();
 		namespace.add("/");
 		//currChunkserver = 0;
 		//Write networking
@@ -288,8 +289,12 @@ public class Master {
 	 * Example usage: OpenFile("/Shahram/CSCI485/Lecture1/Intro.pptx", FH1)
 	 */
 	public FSReturnVals OpenFile(String FilePath, FileHandle ofh) {
-		// Return the FilePath as a file handle. Vacuous.
-		return null;
+		if(namespace.indexOf(FilePath) < 0)
+		{
+			return ClientFS.FSReturnVals.FileDoesNotExist;
+		}
+		ofh.filename = FilePath;
+		return ClientFS.FSReturnVals.Success;
 	}
 
 	/**
@@ -298,7 +303,11 @@ public class Master {
 	 * Example usage: CloseFile(FH1)
 	 */
 	public FSReturnVals CloseFile(FileHandle ofh) {
-		return null;
+		if(namespace.indexOf(ofh.filename) < 0)
+		{
+			return ClientFS.FSReturnVals.BadHandle;
+		}
+		return ClientFS.FSReturnVals.Success;
 	}
 
 	
