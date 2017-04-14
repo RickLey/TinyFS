@@ -12,9 +12,6 @@ public class ClientRec {
 	//Passing (1, "") in arguments for part one ONLY. that will change with networking.
 	Master master = new Master(1, "");
 	
-	// CHANGE TO master.chunkServer();
-	ChunkServer cs = new ChunkServer();
-	
 	/**
 	 * Appends a record to the open file as specified by ofh Returns BadHandle
 	 * if ofh is invalid Returns BadRecID if the specified RID is not null
@@ -36,41 +33,36 @@ public class ClientRec {
 			return ClientFS.FSReturnVals.RecordTooLong;
 		}
 		
-		//Check file handle with master
-		//String chunkHandle = master.validateFileHandle();
+		//verify with master
+		if(!master.VerifyFileHandle(ofh.filename)){
+			return ClientFS.FSReturnVals.BadHandle;
+		}	
 		
+		//Get chunk handle from master
+		String chunkHandle = master.GetHandleForAppend(ofh.filename, length);
 
-		/*
-		 *  Master validates existence of file, looks up entry in map to chunk lists
-		 *  Checks remaining space in last chunk (initialized to zero for a new file).
-		 *  If chunk does not have
-		 *  space to hold the whole record + metadata (size of record), creates a new chunk. 
-		 *  Otherwise, returns
-		 *  the last in the list 
-		 *  (The master keeps an integer for remaining space on the last chunk and 
-		 *  decrements it by the size of the payload. Resets it to max size upon 
-		 *  new chunk creation.
-		 *  Master must also send offset into chunk at which to append
-		 */
+		// Write the length of the record (2 bytes) right before the record itself	
+		//Convert short to byte[] for chunk server
+		ByteBuffer buffer = ByteBuffer.allocate(2);
+		buffer.putShort(length);
 		
-		// Master returns chunk handle of last chunk
+		// Write the length NOT SURE ABOUT THE OFFSET BEING 0
+		master.chunkserver.writeChunk(chunkHandle, buffer.array(), 0);
 		
-		// Calls writeChunk with chunk handle, offset, payload. Must write
-		// The length of the record (2 bytes) right before the record itself
+		// Write the dirty byte
+		buffer = ByteBuffer.allocate(1);
+		buffer.putShort((short) 1);
+		master.chunkserver.writeChunk(chunkHandle, payload, 0);
 		
+		//write data
+		master.chunkserver.writeChunk(chunkHandle, payload, 0);
 		
-		
-		//cs.writeChunk(ofh, );
-		
-		
-		// And a byte to indicate (in)valid
 		// Populates RID
-		// Returns returnval
+		RecordID = new RID();
+		RecordID.chunkHandle = chunkHandle;
+		RecordID.chunkOffset = length;
 		
-		
-		
-		
-		return null;
+		return ClientFS.FSReturnVals.Success;
 	}
 
 	/**
@@ -94,15 +86,37 @@ public class ClientRec {
 	 * Example usage: ReadFirstRecord(FH1, tinyRec)
 	 */
 	public FSReturnVals ReadFirstRecord(FileHandle ofh, TinyRec rec){
-		// Call master
-		/*
-		 * Master returns first chunk handle for that file handle
-		 */
+
+		//Verify handle with master
+		if(!master.VerifyFileHandle(ofh.filename)){
+			return ClientFS.FSReturnVals.BadHandle;
+		}
 		
-		// Call read chunk. Read the first four bytes to determine how long the record is
-		// Read read that much more into the chunk
-		// Note: 
-		return null;
+		//Get chunk handle from master
+		String chunkHandle = master.GetFirstChunkHandleForFile(ofh.filename);
+		
+		//Read the first 2 bytes to determine how long the record is
+		byte[] length = master.chunkserver.readChunk(chunkHandle, 0, 2);
+		
+		if(length.length == 0){
+			return ClientFS.FSReturnVals.RecDoesNotExist;
+		}
+		
+		//Convert short to byte[] for chunk server
+		ByteBuffer buffer = ByteBuffer.wrap(length);
+		int len =  buffer.getInt();
+		
+		//Read at offset 2 (because previous read) for len number of bytes
+		byte[] payload = master.chunkserver.readChunk(chunkHandle, 2, len);
+		
+		//Populate rec
+		rec.setPayload(payload);
+		RID r = new RID();
+		r.chunkHandle = chunkHandle;
+		r.chunkOffset = len+3; //+3 because of metadata
+		rec.setRID(r);
+		
+		return ClientFS.FSReturnVals.Success;
 	}
 
 	/**

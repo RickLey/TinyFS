@@ -18,7 +18,7 @@ public class Master {
 	/*ArrayList<Socket> chunkserverConnections;
 	int currChunkserver;*/
 	
-	ChunkServer chunkserver;
+	public ChunkServer chunkserver;
 	//Locks
 	
 	
@@ -34,12 +34,12 @@ public class Master {
 		chunkserver = new ChunkServer();
 	}
 	
-	boolean VerifyFileHandle(String fileHandle)
+	public boolean VerifyFileHandle(String fileHandle)
 	{
 		return !chunkLists.containsKey(fileHandle);
 	}
 	
-	boolean VerifyFileHandleAndChunkHandle(String fileHandle, String chunkHandle){
+	public boolean VerifyFileHandleAndChunkHandle(String fileHandle, String chunkHandle){
 		return VerifyFileHandle(fileHandle) ||
 				chunkLists.get(fileHandle).indexOf(chunkHandle) >= 0;
 	}
@@ -47,29 +47,29 @@ public class Master {
 	/*
 	 * Assumes file and chunk handle have already been validated
 	 */
-	String GetNextChunkHandle(String fileHandle, String ChunkHandle){
+	public String GetNextChunkHandle(String fileHandle, String ChunkHandle){
 		ArrayList<String> list = chunkLists.get(fileHandle);
 		int index = list.indexOf(ChunkHandle) + 1;
 		return index < list.size() ? list.get(index) : null;
 	}
 	
-	String GetPreviousChunkHandle(String fileHandle, String ChunkHandle){
+	public String GetPreviousChunkHandle(String fileHandle, String ChunkHandle){
 		ArrayList<String> list = chunkLists.get(fileHandle);
 		int index = list.indexOf(ChunkHandle) - 1;
 		return index > 0 ? list.get(index) : null;
 	}
 	
-	String GetLastChunkHandleOfAFile(String FileHandle){
+	public String GetLastChunkHandleOfAFile(String FileHandle){
 		ArrayList<String> list = chunkLists.get(FileHandle);
 		return list.size() > 0 ? list.get(list.size() - 1) : null;
 	}
 	
-	String GetFirstChunkHandleForFile(String FileHandle){
+	public String GetFirstChunkHandleForFile(String FileHandle){
 		ArrayList<String> list = chunkLists.get(FileHandle);
 		return list.size() > 0 ? list.get(0) : null;
 	}
 	
-	String GetHandleForAppend(String FileHandle, Integer payloadSize){
+	public String GetHandleForAppend(String FileHandle, short payloadSize){
 		int remainingSpace = remainingChunkSpace.get(FileHandle);
 		if(payloadSize < remainingSpace)
 		{
