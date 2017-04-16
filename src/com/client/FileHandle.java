@@ -1,7 +1,7 @@
 package com.client;
 
 public class FileHandle {
-	String filename;
+	public String filename;
 	
 	public FileHandle(String handle)
 	{
