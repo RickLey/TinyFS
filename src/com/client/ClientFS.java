@@ -280,8 +280,30 @@ public class ClientFS {
 	 */
 	public FSReturnVals OpenFile(String FilePath, FileHandle ofh) {
 		// Return the FilePath as a file handle. Vacuous.
-//		return master.OpenFile(FilePath, ofh);
-		return FSReturnVals.NotImplemented;
+		byte[] filepathBytes = FilePath.getBytes();
+
+		try {
+			int outPacketSize = 16 + filepathBytes.length;
+			out.writeInt(outPacketSize);
+			out.writeInt(Master.OPEN_FILE_CMD);
+			out.writeInt(filepathBytes.length);
+			out.write(filepathBytes);
+			out.flush();
+
+			int inPacketSize = in.readInt();
+			int retValue = in.readInt();
+
+			if (retValue == FSReturnVals.Success.getValue()) {
+				String filename = readString(in, in.readInt());
+				ofh.filename = filename;
+			}
+
+			return FSReturnVals.valueOf(retValue);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return FSReturnVals.Fail;
 	}
 
 	/**
@@ -290,8 +312,34 @@ public class ClientFS {
 	 * Example usage: CloseFile(FH1)
 	 */
 	public FSReturnVals CloseFile(FileHandle ofh) {
-//		return master.CloseFile(ofh);
-		return FSReturnVals.NotImplemented;
+		// Return the FilePath as a file handle. Vacuous.
+		byte[] filenameBytes = ofh.filename.getBytes();
+
+		try {
+			int outPacketSize = 16 + filenameBytes.length;
+			out.writeInt(outPacketSize);
+			out.writeInt(Master.CLOSE_FILE_CMD);
+			out.writeInt(filenameBytes.length);
+			out.write(filenameBytes);
+			out.flush();
+
+			int inPacketSize = in.readInt();
+			int retValue = in.readInt();
+			return FSReturnVals.valueOf(retValue);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return FSReturnVals.BadHandle;
+	}
+
+	private String readString(DataInputStream in, int size) throws IOException {
+		byte[] bytes = new byte[size];
+		int bytesRead = 0;
+		while (bytesRead < size) {
+			bytesRead += in.read(bytes, bytesRead, size - bytesRead);
+		}
+		return new String(bytes);
 	}
 
 }

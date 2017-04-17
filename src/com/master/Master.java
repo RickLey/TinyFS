@@ -588,6 +588,63 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
+	/*	OPEN_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filepath size
+	 * 	...		filepath
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 * 	8-11	filename length
+	 * 	...		filename
+	 *
+	 */
+	public void handleOpenFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filepathSize = in.readInt();
+
+		String filepath = readString(in, filepathSize);
+
+		FileHandle handle = new FileHandle();
+		FSReturnVals returnVal = OpenFile(filepath, handle);
+
+		if (returnVal == FSReturnVals.Success) {
+			byte[] filenameBytes = handle.filename.getBytes();
+			out.writeInt(12 + filenameBytes.length);
+			out.writeInt(returnVal.getValue());
+			out.writeInt(filenameBytes.length);
+			out.write(filenameBytes);
+		} else {
+			out.writeInt(8);
+			out.writeInt(returnVal.getValue());
+		}
+	}
+
+	/*	CLOSE_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filepath size
+	 * 	12-15	filename size
+	 * 	...		filepath
+	 * 	...		filename
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleCloseFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filenameSize = in.readInt();
+
+		String filename = readString(in, filenameSize);
+
+		FSReturnVals returnVal = CloseFile(new FileHandle(filename));
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
 	@Override
 	public void run() {
 		try {
@@ -628,11 +685,11 @@ public class Master implements Runnable {
 						break;
 
 					case OPEN_FILE_CMD:
-						// TODO
+						handleOpenFileCmd(in, out);
 						break;
 
 					case CLOSE_FILE_CMD:
-						// TODO
+						handleCloseFileCmd(in, out);
 						break;
 				}
 
