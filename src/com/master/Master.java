@@ -100,6 +100,9 @@ public class Master {
 		}
 	}
 	
+	public int getEndOffset(String fileHandle){
+		return remainingChunkSpace.get(fileHandle);
+	}
 	
 	public static void main(String[] args) {
 		new Master(1234, "localhost");
