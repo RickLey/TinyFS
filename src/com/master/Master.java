@@ -377,6 +377,40 @@ public class Master {
 		}
 	}
 
+	/*	CREATE_DIR_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	src size
+	 * 	12-15	dirname size
+	 * 	...		src
+	 * 	...		dirname
+	 *
+	 */
+	public void handleCreateDirCmd(int packetSize, DataInputStream in, DataOutputStream out) throws IOException {
+		int srcSize = in.readInt();
+		int dirnameSize = in.readInt();
+
+		byte[] srcBytes = new byte[srcSize];
+		int bytesRead = 0;
+		while (bytesRead < srcSize) {
+			bytesRead += in.read(srcBytes, bytesRead, srcSize - bytesRead);
+		}
+		String src = new String(srcBytes);
+
+		byte[] dirnameBytes = new byte[dirnameSize];
+		bytesRead = 0;
+		while (bytesRead < dirnameSize) {
+			bytesRead += in.read(dirnameBytes, bytesRead, dirnameSize - bytesRead);
+		}
+		String dirname = new String(dirnameBytes);
+
+		FSReturnVals returnVal = CreateDir(src, dirname);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
 	public static void main(String[] args) {
 		Master master = new Master();
 
@@ -401,7 +435,7 @@ public class Master {
 					int command = in.readInt();
 					switch (command) {
 						case CREATE_DIR_CMD:
-							// TODO
+							master.handleCreateDirCmd(packetSize, in, out);
 							break;
 
 						case DELETE_DIR_CMD:
@@ -432,6 +466,8 @@ public class Master {
 							// TODO
 							break;
 					}
+
+					out.flush();
 				}
 			}
 		} catch (IOException e) {
