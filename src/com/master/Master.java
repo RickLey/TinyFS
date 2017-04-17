@@ -472,6 +472,7 @@ public class Master {
 				in = new DataInputStream(new BufferedInputStream(connection.getInputStream()));
 
 				while (!connection.isClosed()) {
+					while (in.available() <= 0);
 					int packetSize = in.readInt();
 					if (packetSize == -1) {
 						break;
