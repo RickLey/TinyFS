@@ -7,8 +7,10 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.net.ServerSocket;
@@ -79,22 +81,14 @@ public class Master implements Serializable, Runnable{
 		//currChunkserver = 0;
 		//Write networking
 
+		namespaceLock = new ReentrantLock();
 		
 		chunkserver = new ChunkServer();
 	}
 	public Master(Socket socket)
 	{
 		if (namespace == null) {
-			namespace = new ArrayList<String>();
-			chunkLists = new HashMap<String, ArrayList<String>>();
-			chunkLocations = new HashMap<String, String>();
-			remainingChunkSpace = new HashMap<String, Integer>();
-			namespace.add("/");
-			//currChunkserver = 0;
-
-			namespaceLock = new ReentrantLock();
-
-			chunkserver = new ChunkServer();
+			initializeDataStructures();
 		}
 
 		connection = socket;
@@ -135,6 +129,8 @@ public class Master implements Serializable, Runnable{
 		}
 		namespace.add(index, fullPath);
 		// No chunkLists entry because directories do not consist of chunks
+		
+		saveState();
 
 		namespaceLock.unlock();
 
@@ -170,8 +166,9 @@ public class Master implements Serializable, Runnable{
 		}
 		
 		namespace.remove(dirIndex);
-
+		saveState();
 		namespaceLock.unlock();
+		
 
 		return ClientFS.FSReturnVals.Success;
 	}
@@ -229,6 +226,8 @@ public class Master implements Serializable, Runnable{
 
 		// Must sort at the end to maintain canonical order? -- shouldn't be necessary
 		// as they will all still be clustered
+		
+		saveState();
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -315,6 +314,7 @@ public class Master implements Serializable, Runnable{
 		chunkLists.put(fullPath, new ArrayList<String>());
 		remainingChunkSpace.put(fullPath, 0); // Because no chunk allocated yet.
 		// Files are handled the same as directories. All directories end with a /
+		saveState();
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -347,6 +347,8 @@ public class Master implements Serializable, Runnable{
 		}
 		chunkLists.remove(fullPath);
 		remainingChunkSpace.remove(fullPath);
+		
+		saveState();
 		
 		// Tell chunkservers to delete those files?
 		
@@ -426,6 +428,7 @@ public class Master implements Serializable, Runnable{
 		{
 			ArrayList<String> list = chunkLists.get(FileHandle);
 			remainingChunkSpace.put(FileHandle, remainingSpace - payloadSize);
+			saveState();
 			return list.get(list.size() - 1);
 		}
 		else
@@ -447,24 +450,25 @@ public class Master implements Serializable, Runnable{
 			String chunkHandle = chunkserver.createChunk();
 			chunkLists.get(FileHandle).add(chunkHandle); // add the handle to the list for this file
 			remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize); // reset the remaining space to be chunksize - payloadsize
+			saveState();
 			return chunkHandle;
 		}
 	}	
 	private void writeObject(java.io.ObjectOutputStream out) throws IOException
 	{
-		/*out.writeObject(namespace);
+		out.writeObject(namespace);
 		out.writeObject(chunkLists);
 		out.writeObject(chunkLocations);
-		out.writeObject(remainingChunkSpace);*/
-		out.defaultWriteObject();
+		out.writeObject(remainingChunkSpace);
+		//out.defaultWriteObject();
 	}
 	private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException
 	{
-		/*namespace = (ArrayList<String>) in.readObject();
+		namespace = (ArrayList<String>) in.readObject();
 		chunkLists = (HashMap<String, ArrayList<String>>) in.readObject();
 		chunkLocations = (HashMap<String, String>) in.readObject();
-		remainingChunkSpace = (HashMap<String, Integer>) in.readObject();*/
-		in.defaultReadObject();
+		remainingChunkSpace = (HashMap<String, Integer>) in.readObject();
+		//in.defaultReadObject();
 	}
 	private void readObjectNoData() throws ObjectStreamException
 	{
@@ -762,8 +766,23 @@ public class Master implements Serializable, Runnable{
 			e.printStackTrace();
 		}
 	}
+	
+	private void saveState()
+	{
+		FileOutputStream fos;
+		ObjectOutputStream oos;
+		try {
+			fos = new FileOutputStream("state.txt");
+			oos = new ObjectOutputStream(fos);
+			oos.writeObject(this);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
 
-	/*public static void main(String[] args) {
+	public static void main(String[] args) {
 		Master initialMaster = new Master(null);
 
 		try {
@@ -784,17 +803,21 @@ public class Master implements Serializable, Runnable{
 			e.printStackTrace();
 			return;
 		}
-	}*/
+	}
 	
 	public static void main(String[] args) {
 		FileInputStream fis;
+		Master master;
 		try {
 			fis = new FileInputStream("state.txt");
+			System.out.println("Found state File");
 			ObjectInputStream ois = new ObjectInputStream(fis);
-			Master master = (Master) ois.readObject();
+			master = (Master) ois.readObject();
+			System.out.println(master.namespace.toString());
 		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			master = new Master();
+			master.CreateDir("/", "testDir");
+			master.CreateFile("/testDir/", "testfile");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
