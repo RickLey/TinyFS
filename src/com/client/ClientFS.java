@@ -64,7 +64,7 @@ public class ClientFS {
 			ioe.printStackTrace();
 		}*/
 		
-		master = new Master(0, null);
+		master = new Master();
 	}
 
 	/**

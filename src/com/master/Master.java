@@ -1,6 +1,7 @@
 package com.master;
 
-import java.io.IOException;
+import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,14 +15,14 @@ public class Master {
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
 
-	public static int CREATE_DIR_CMD = 101;
-	public static int DELETE_DIR_CMD = 102;
-	public static int RENAME_DIR_CMD = 103;
-	public static int LIST_DIR_CMD = 104;
-	public static int CREATE_FILE_CMD = 105;
-	public static int DELETE_FILE_CMD = 106;
-	public static int OPEN_FILE_CMD = 107;
-	public static int CLOSE_FILE_CMD = 108;
+	public static final int CREATE_DIR_CMD = 101;
+	public static final int DELETE_DIR_CMD = 102;
+	public static final int RENAME_DIR_CMD = 103;
+	public static final int LIST_DIR_CMD = 104;
+	public static final int CREATE_FILE_CMD = 105;
+	public static final int DELETE_FILE_CMD = 106;
+	public static final int OPEN_FILE_CMD = 107;
+	public static final int CLOSE_FILE_CMD = 108;
 
 	//Ordered list of FileHandles(String)
 	//Map from FileHandle to list of chunkHandle's
@@ -41,7 +42,7 @@ public class Master {
 	
 	
 	
-	public Master(int portNumber, String hostname)
+	public Master()
 	{
 		namespace = new ArrayList<String>();
 		chunkLists = new HashMap<String, ArrayList<String>>();
@@ -49,7 +50,6 @@ public class Master {
 		remainingChunkSpace = new HashMap<String, Integer>();
 		namespace.add("/");
 		//currChunkserver = 0;
-		//Write networking
 		
 		chunkserver = new ChunkServer();
 	}
@@ -376,11 +376,68 @@ public class Master {
 			return chunkHandle;
 		}
 	}
-	
-	
-	public static void main(String[] args) {
-		new Master(PORT, HOST);
 
+	public static void main(String[] args) {
+		Master master = new Master();
+
+		try {
+			ServerSocket server = new ServerSocket(Master.PORT);
+
+			Socket connection = null;
+			DataOutputStream out = null;
+			DataInputStream in = null;
+
+			while (true) {
+				connection = server.accept();
+				out = new DataOutputStream(new BufferedOutputStream(connection.getOutputStream()));
+				in = new DataInputStream(new BufferedInputStream(connection.getInputStream()));
+
+				while (!connection.isClosed()) {
+					int packetSize = in.readInt();
+					if (packetSize == -1) {
+						break;
+					}
+
+					int command = in.readInt();
+					switch (command) {
+						case CREATE_DIR_CMD:
+							// TODO
+							break;
+
+						case DELETE_DIR_CMD:
+							// TODO
+							break;
+
+						case RENAME_DIR_CMD:
+							// TODO
+							break;
+
+						case LIST_DIR_CMD:
+							// TODO
+							break;
+
+						case CREATE_FILE_CMD:
+							// TODO
+							break;
+
+						case DELETE_FILE_CMD:
+							// TODO
+							break;
+
+						case OPEN_FILE_CMD:
+							// TODO
+							break;
+
+						case CLOSE_FILE_CMD:
+							// TODO
+							break;
+					}
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
 	}
 
 }
