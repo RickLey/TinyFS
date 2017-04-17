@@ -386,8 +386,11 @@ public class Master {
 	 * 	...		src
 	 * 	...		dirname
 	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
 	 */
-	public void handleCreateDirCmd(int packetSize, DataInputStream in, DataOutputStream out) throws IOException {
+	public void handleCreateDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
 		int srcSize = in.readInt();
 		int dirnameSize = in.readInt();
 
@@ -409,6 +412,48 @@ public class Master {
 
 		out.writeInt(8);
 		out.writeInt(returnVal.getValue());
+	}
+
+	/*	LIST_DIR_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	target size
+	 * 	...		target
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		number of listings (n)
+	 * 	8-11	length of string F1
+	 * 	...		string F1
+	 * 			...
+	 * 	...		length of string Fn
+	 * 	...		string Fn
+	 *
+	 */
+	public void handleListDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int targetSize = in.readInt();
+
+		byte[] targetBytes = new byte[targetSize];
+		int bytesRead = 0;
+		while (bytesRead < targetSize) {
+			bytesRead += in.read(targetBytes, bytesRead, targetSize - bytesRead);
+		}
+		String target = new String(targetBytes);
+
+		String[] listings = ListDir(target);
+
+		int returnPacketSize = 8;
+		for (int i = 0 ; i < listings.length ; i++) {
+			returnPacketSize += 4 + listings[i].getBytes().length;
+		}
+		out.writeInt(returnPacketSize);
+
+		out.writeInt(listings.length);
+		for (int i = 0 ; i < listings.length ; i++) {
+			byte[] listingBytes = listings[i].getBytes();
+			out.writeInt(listingBytes.length);
+			out.write(listingBytes);
+		}
 	}
 
 	public static void main(String[] args) {
@@ -435,7 +480,7 @@ public class Master {
 					int command = in.readInt();
 					switch (command) {
 						case CREATE_DIR_CMD:
-							master.handleCreateDirCmd(packetSize, in, out);
+							master.handleCreateDirCmd(in, out);
 							break;
 
 						case DELETE_DIR_CMD:
@@ -447,7 +492,7 @@ public class Master {
 							break;
 
 						case LIST_DIR_CMD:
-							// TODO
+							master.handleListDirCmd(in, out);
 							break;
 
 						case CREATE_FILE_CMD:
