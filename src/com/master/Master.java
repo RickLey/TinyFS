@@ -1,5 +1,9 @@
 package com.master;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -7,43 +11,49 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.chunkserver.ChunkServer;
 import com.client.FileHandle;
 import com.client.ClientFS;
 import com.client.ClientFS.FSReturnVals;
-public class Master implements Serializable{
+public class Master implements Serializable, Runnable{
 
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
 
-	public static int CREATE_DIR_CMD = 101;
-	public static int DELETE_DIR_CMD = 102;
-	public static int RENAME_DIR_CMD = 103;
-	public static int LIST_DIR_CMD = 104;
-	public static int CREATE_FILE_CMD = 105;
-	public static int DELETE_FILE_CMD = 106;
-	public static int OPEN_FILE_CMD = 107;
-	public static int CLOSE_FILE_CMD = 108;
+	public static final int CREATE_DIR_CMD = 101;
+	public static final int DELETE_DIR_CMD = 102;
+	public static final int RENAME_DIR_CMD = 103;
+	public static final int LIST_DIR_CMD = 104;
+	public static final int CREATE_FILE_CMD = 105;
+	public static final int DELETE_FILE_CMD = 106;
+	public static final int OPEN_FILE_CMD = 107;
+	public static final int CLOSE_FILE_CMD = 108;
 
 	//Ordered list of FileHandles(String)
 	//Map from FileHandle to list of chunkHandle's
 	//Map from chunkHandle to chunkServer
 	//Locks
 	
-	ArrayList<String> namespace; //Ordered list of FileHandles(String)
-	HashMap<String, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
-	HashMap<String, String> chunkLocations; //Map from chunkHandle to chunkServer IPs
-	HashMap<String, Integer> remainingChunkSpace; // How much space is left in last chunk of a file
+	private static ArrayList<String> namespace; //Ordered list of FileHandles(String)
+	private static HashMap<String, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
+	private static HashMap<String, String> chunkLocations; //Map from chunkHandle to chunkServer IPs
+	private static HashMap<String, Integer> remainingChunkSpace; // How much space is left in last chunk of a file
+
+	private static ReentrantLock namespaceLock;
 	
 	/*ArrayList<Socket> chunkserverConnections;
 	int currChunkserver;*/
-	
-	ChunkServer chunkserver;
+
+	private static ChunkServer chunkserver;
 	//Locks
+
+	private Socket connection;
 	
 	public Master()
 	{
@@ -72,6 +82,23 @@ public class Master implements Serializable{
 		
 		chunkserver = new ChunkServer();
 	}
+	public Master(Socket socket)
+	{
+		if (namespace == null) {
+			namespace = new ArrayList<String>();
+			chunkLists = new HashMap<String, ArrayList<String>>();
+			chunkLocations = new HashMap<String, String>();
+			remainingChunkSpace = new HashMap<String, Integer>();
+			namespace.add("/");
+			//currChunkserver = 0;
+
+			namespaceLock = new ReentrantLock();
+
+			chunkserver = new ChunkServer();
+		}
+
+		connection = socket;
+	}
 	
 	public void startServer(int portNumber, String hostname)
 	{
@@ -87,6 +114,8 @@ public class Master implements Serializable{
 	 * "CSCI485"), CreateDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals CreateDir(String src, String dirname) {
+		namespaceLock.lock();
+
 		int parentIndex = namespace.indexOf(src);
 		if(parentIndex < 0)
 		{
@@ -106,6 +135,9 @@ public class Master implements Serializable{
 		}
 		namespace.add(index, fullPath);
 		// No chunkLists entry because directories do not consist of chunks
+
+		namespaceLock.unlock();
+
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -117,6 +149,8 @@ public class Master implements Serializable{
 	 * Example usage: DeleteDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals DeleteDir(String src, String dirname) {
+		namespaceLock.lock();
+
 		int parentIndex = namespace.indexOf(src);
 		if(parentIndex < 0)
 		{
@@ -136,6 +170,9 @@ public class Master implements Serializable{
 		}
 		
 		namespace.remove(dirIndex);
+
+		namespaceLock.unlock();
+
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -148,14 +185,18 @@ public class Master implements Serializable{
 	 * "/Shahram/CSCI485" to "/Shahram/CSCI550"
 	 */
 	public FSReturnVals RenameDir(String src, String NewName) {
+		namespaceLock.lock();
+
 		int index = namespace.indexOf(src + "/");
 		if(index < 0)
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.SrcDirNotExistent;
 		}
 		
 		if(namespace.indexOf(NewName + "/") >= 0)
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.DestDirExists;
 		}
 		
@@ -183,7 +224,9 @@ public class Master implements Serializable{
 			}
 			temp = namespace.get(index);
 		}
-		
+
+		namespaceLock.unlock();
+
 		// Must sort at the end to maintain canonical order? -- shouldn't be necessary
 		// as they will all still be clustered
 		return ClientFS.FSReturnVals.Success;
@@ -197,10 +240,13 @@ public class Master implements Serializable{
 	 * Example usage: ListDir("/Shahram/CSCI485")
 	 */
 	public String[] ListDir(String tgt) {
+		namespaceLock.lock();
+
 		// Iterate through ordered list until there's a prefix that is not the target dir
 		int index = namespace.indexOf(tgt + "/");
 		if(index < 0)
 		{
+			namespaceLock.unlock();
 			return null;
 		}
 		
@@ -229,6 +275,8 @@ public class Master implements Serializable{
 			}
 
 		}
+
+		namespaceLock.unlock();
 				
 		if(result.size() == 0)
 		{
@@ -401,8 +449,7 @@ public class Master implements Serializable{
 			remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize); // reset the remaining space to be chunksize - payloadsize
 			return chunkHandle;
 		}
-	}
-	
+	}	
 	private void writeObject(java.io.ObjectOutputStream out) throws IOException
 	{
 		/*out.writeObject(namespace);
@@ -424,6 +471,320 @@ public class Master implements Serializable{
 		 initializeDataStructures();
 	}
 	
+	private String readString(DataInputStream in, int size) throws IOException {
+		byte[] bytes = new byte[size];
+		int bytesRead = 0;
+		while (bytesRead < size) {
+			bytesRead += in.read(bytes, bytesRead, size - bytesRead);
+		}
+		return new String(bytes);
+	}
+
+	/*	CREATE_DIR_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	src size
+	 * 	12-15	dirname size
+	 * 	...		src
+	 * 	...		dirname
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleCreateDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int srcSize = in.readInt();
+		int dirnameSize = in.readInt();
+
+		String src = readString(in, srcSize);
+		String dirname = readString(in, dirnameSize);
+
+		FSReturnVals returnVal = CreateDir(src, dirname);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
+	/*	DELETE_DIR_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	src size
+	 * 	12-15	dirname size
+	 * 	...		src
+	 * 	...		dirname
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleDeleteDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int srcSize = in.readInt();
+		int dirnameSize = in.readInt();
+
+		String src = readString(in, srcSize);
+		String dirname = readString(in, dirnameSize);
+
+		FSReturnVals returnVal = DeleteDir(src, dirname);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
+	/*	RENAME_DIR_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	src size
+	 * 	12-15	newname size
+	 * 	...		src
+	 * 	...		newname
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleRenameDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int srcSize = in.readInt();
+		int newnameSize = in.readInt();
+
+		String src = readString(in, srcSize);
+		String newname = readString(in, newnameSize);
+
+		FSReturnVals returnVal = RenameDir(src, newname);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
+	/*	LIST_DIR_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	target size
+	 * 	...		target
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		number of listings (n)
+	 * 	8-11	length of string F1
+	 * 	...		string F1
+	 * 			...
+	 * 	...		length of string Fn
+	 * 	...		string Fn
+	 *
+	 */
+	public void handleListDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int targetSize = in.readInt();
+
+		String target = readString(in, targetSize);
+
+		String[] listings = ListDir(target);
+
+		if (listings == null) {
+			out.writeInt(4);
+		} else {
+			int returnPacketSize = 8;
+			for (int i = 0 ; i < listings.length ; i++) {
+				returnPacketSize += 4 + listings[i].getBytes().length;
+			}
+			out.writeInt(returnPacketSize);
+
+			out.writeInt(listings.length);
+			for (int i = 0 ; i < listings.length ; i++) {
+				byte[] listingBytes = listings[i].getBytes();
+				out.writeInt(listingBytes.length);
+				out.write(listingBytes);
+			}
+		}
+	}
+
+	/*	CREATE_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	tgtdir size
+	 * 	12-15	filename size
+	 * 	...		tgtdir
+	 * 	...		filename
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleCreateFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int tgtdirSize = in.readInt();
+		int filenameSize = in.readInt();
+
+		String tgtdir = readString(in, tgtdirSize);
+		String filename = readString(in, filenameSize);
+
+		FSReturnVals returnVal = CreateFile(tgtdir, filename);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
+	/*	DELETE_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	tgtdir size
+	 * 	12-15	filename size
+	 * 	...		tgtdir
+	 * 	...		filename
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleDeleteFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int tgtdirSize = in.readInt();
+		int filenameSize = in.readInt();
+
+		String tgtdir = readString(in, tgtdirSize);
+		String filename = readString(in, filenameSize);
+
+		FSReturnVals returnVal = DeleteFile(tgtdir, filename);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
+	/*	OPEN_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filepath size
+	 * 	...		filepath
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 * 	8-11	filename length
+	 * 	...		filename
+	 *
+	 */
+	public void handleOpenFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filepathSize = in.readInt();
+
+		String filepath = readString(in, filepathSize);
+
+		FileHandle handle = new FileHandle();
+		FSReturnVals returnVal = OpenFile(filepath, handle);
+
+		if (returnVal == FSReturnVals.Success) {
+			byte[] filenameBytes = handle.filename.getBytes();
+			out.writeInt(12 + filenameBytes.length);
+			out.writeInt(returnVal.getValue());
+			out.writeInt(filenameBytes.length);
+			out.write(filenameBytes);
+		} else {
+			out.writeInt(8);
+			out.writeInt(returnVal.getValue());
+		}
+	}
+
+	/*	CLOSE_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filepath size
+	 * 	12-15	filename size
+	 * 	...		filepath
+	 * 	...		filename
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleCloseFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filenameSize = in.readInt();
+
+		String filename = readString(in, filenameSize);
+
+		FSReturnVals returnVal = CloseFile(new FileHandle(filename));
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
+	@Override
+	public void run() {
+		try {
+			DataOutputStream out = new DataOutputStream(new BufferedOutputStream(connection.getOutputStream()));
+			DataInputStream in = new DataInputStream(new BufferedInputStream(connection.getInputStream()));
+
+			while (!connection.isClosed()) {
+				while (in.available() <= 0);
+				int packetSize = in.readInt();
+				if (packetSize == -1) {
+					break;
+				}
+
+				int command = in.readInt();
+				switch (command) {
+					case CREATE_DIR_CMD:
+						handleCreateDirCmd(in, out);
+						break;
+
+					case DELETE_DIR_CMD:
+						handleDeleteDirCmd(in, out);
+						break;
+
+					case RENAME_DIR_CMD:
+						handleRenameDirCmd(in, out);
+						break;
+
+					case LIST_DIR_CMD:
+						handleListDirCmd(in, out);
+						break;
+
+					case CREATE_FILE_CMD:
+						handleCreateFileCmd(in, out);
+						break;
+
+					case DELETE_FILE_CMD:
+						handleDeleteFileCmd(in, out);
+						break;
+
+					case OPEN_FILE_CMD:
+						handleOpenFileCmd(in, out);
+						break;
+
+					case CLOSE_FILE_CMD:
+						handleCloseFileCmd(in, out);
+						break;
+				}
+
+				out.flush();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/*public static void main(String[] args) {
+		Master initialMaster = new Master(null);
+
+		try {
+			ServerSocket server = new ServerSocket(Master.PORT);
+
+			Socket connection = null;
+
+			ArrayList<Thread> threads = new ArrayList<Thread>();
+
+			while (true) {
+				connection = server.accept();
+				Master master = new Master(connection);
+				Thread thread = new Thread(master);
+				thread.start();
+				threads.add(thread);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+			return;
+		}
+	}*/
 	
 	public static void main(String[] args) {
 		FileInputStream fis;
@@ -435,6 +796,9 @@ public class Master implements Serializable{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
