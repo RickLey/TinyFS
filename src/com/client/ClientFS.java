@@ -149,9 +149,6 @@ public class ClientFS {
 
 			int inPacketSize = in.readInt();
 			int retValue = in.readInt();
-			if (FSReturnVals.valueOf(retValue) == FSReturnVals.Fail) {
-				System.out.println("Master returned FAIL");
-			}
 			return FSReturnVals.valueOf(retValue);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -219,8 +216,28 @@ public class ClientFS {
 		// Master will insert filename into ordered list
 		
 		// Files are handled the same as directories. All directories end with a /
-//		return master.CreateFile(tgtdir, filename);
-		return FSReturnVals.NotImplemented;
+
+		byte[] tgtdirBytes = tgtdir.getBytes();
+		byte[] filenameBytes = filename.getBytes();
+
+		try {
+			int outPacketSize = 16 + tgtdirBytes.length + filenameBytes.length;
+			out.writeInt(outPacketSize);
+			out.writeInt(Master.CREATE_FILE_CMD);
+			out.writeInt(tgtdirBytes.length);
+			out.writeInt(filenameBytes.length);
+			out.write(tgtdirBytes);
+			out.write(filenameBytes);
+			out.flush();
+
+			int inPacketSize = in.readInt();
+			int retValue = in.readInt();
+			return FSReturnVals.valueOf(retValue);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return FSReturnVals.Fail;
 	}
 
 	/**
@@ -231,8 +248,27 @@ public class ClientFS {
 	 * Example usage: DeleteFile("/Shahram/CSCI485/Lecture1/", "Intro.pptx")
 	 */
 	public FSReturnVals DeleteFile(String tgtdir, String filename) {
-//		return master.DeleteFile(tgtdir, filename);
-		return FSReturnVals.NotImplemented;
+		byte[] tgtdirBytes = tgtdir.getBytes();
+		byte[] filenameBytes = filename.getBytes();
+
+		try {
+			int outPacketSize = 16 + tgtdirBytes.length + filenameBytes.length;
+			out.writeInt(outPacketSize);
+			out.writeInt(Master.DELETE_FILE_CMD);
+			out.writeInt(tgtdirBytes.length);
+			out.writeInt(filenameBytes.length);
+			out.write(tgtdirBytes);
+			out.write(filenameBytes);
+			out.flush();
+
+			int inPacketSize = in.readInt();
+			int retValue = in.readInt();
+			return FSReturnVals.valueOf(retValue);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return FSReturnVals.Fail;
 	}
 
 	/**

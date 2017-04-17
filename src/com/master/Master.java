@@ -408,6 +408,15 @@ public class Master implements Runnable {
 		}
 	}
 
+	private String readString(DataInputStream in, int size) throws IOException {
+		byte[] bytes = new byte[size];
+		int bytesRead = 0;
+		while (bytesRead < size) {
+			bytesRead += in.read(bytes, bytesRead, size - bytesRead);
+		}
+		return new String(bytes);
+	}
+
 	/*	CREATE_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
@@ -425,19 +434,8 @@ public class Master implements Runnable {
 		int srcSize = in.readInt();
 		int dirnameSize = in.readInt();
 
-		byte[] srcBytes = new byte[srcSize];
-		int bytesRead = 0;
-		while (bytesRead < srcSize) {
-			bytesRead += in.read(srcBytes, bytesRead, srcSize - bytesRead);
-		}
-		String src = new String(srcBytes);
-
-		byte[] dirnameBytes = new byte[dirnameSize];
-		bytesRead = 0;
-		while (bytesRead < dirnameSize) {
-			bytesRead += in.read(dirnameBytes, bytesRead, dirnameSize - bytesRead);
-		}
-		String dirname = new String(dirnameBytes);
+		String src = readString(in, srcSize);
+		String dirname = readString(in, dirnameSize);
 
 		FSReturnVals returnVal = CreateDir(src, dirname);
 
@@ -462,19 +460,8 @@ public class Master implements Runnable {
 		int srcSize = in.readInt();
 		int dirnameSize = in.readInt();
 
-		byte[] srcBytes = new byte[srcSize];
-		int bytesRead = 0;
-		while (bytesRead < srcSize) {
-			bytesRead += in.read(srcBytes, bytesRead, srcSize - bytesRead);
-		}
-		String src = new String(srcBytes);
-
-		byte[] dirnameBytes = new byte[dirnameSize];
-		bytesRead = 0;
-		while (bytesRead < dirnameSize) {
-			bytesRead += in.read(dirnameBytes, bytesRead, dirnameSize - bytesRead);
-		}
-		String dirname = new String(dirnameBytes);
+		String src = readString(in, srcSize);
+		String dirname = readString(in, dirnameSize);
 
 		FSReturnVals returnVal = DeleteDir(src, dirname);
 
@@ -499,19 +486,8 @@ public class Master implements Runnable {
 		int srcSize = in.readInt();
 		int newnameSize = in.readInt();
 
-		byte[] srcBytes = new byte[srcSize];
-		int bytesRead = 0;
-		while (bytesRead < srcSize) {
-			bytesRead += in.read(srcBytes, bytesRead, srcSize - bytesRead);
-		}
-		String src = new String(srcBytes);
-
-		byte[] newnameBytes = new byte[newnameSize];
-		bytesRead = 0;
-		while (bytesRead < newnameSize) {
-			bytesRead += in.read(newnameBytes, bytesRead, newnameSize - bytesRead);
-		}
-		String newname = new String(newnameBytes);
+		String src = readString(in, srcSize);
+		String newname = readString(in, newnameSize);
 
 		FSReturnVals returnVal = RenameDir(src, newname);
 
@@ -538,12 +514,7 @@ public class Master implements Runnable {
 	public void handleListDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
 		int targetSize = in.readInt();
 
-		byte[] targetBytes = new byte[targetSize];
-		int bytesRead = 0;
-		while (bytesRead < targetSize) {
-			bytesRead += in.read(targetBytes, bytesRead, targetSize - bytesRead);
-		}
-		String target = new String(targetBytes);
+		String target = readString(in, targetSize);
 
 		String[] listings = ListDir(target);
 
@@ -563,6 +534,58 @@ public class Master implements Runnable {
 				out.write(listingBytes);
 			}
 		}
+	}
+
+	/*	CREATE_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	tgtdir size
+	 * 	12-15	filename size
+	 * 	...		tgtdir
+	 * 	...		filename
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleCreateFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int tgtdirSize = in.readInt();
+		int filenameSize = in.readInt();
+
+		String tgtdir = readString(in, tgtdirSize);
+		String filename = readString(in, filenameSize);
+
+		FSReturnVals returnVal = CreateFile(tgtdir, filename);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
+	/*	DELETE_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	tgtdir size
+	 * 	12-15	filename size
+	 * 	...		tgtdir
+	 * 	...		filename
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleDeleteFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int tgtdirSize = in.readInt();
+		int filenameSize = in.readInt();
+
+		String tgtdir = readString(in, tgtdirSize);
+		String filename = readString(in, filenameSize);
+
+		FSReturnVals returnVal = DeleteFile(tgtdir, filename);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
 	}
 
 	@Override
@@ -597,11 +620,11 @@ public class Master implements Runnable {
 						break;
 
 					case CREATE_FILE_CMD:
-						// TODO
+						handleCreateFileCmd(in, out);
 						break;
 
 					case DELETE_FILE_CMD:
-						// TODO
+						handleDeleteFileCmd(in, out);
 						break;
 
 					case OPEN_FILE_CMD:
