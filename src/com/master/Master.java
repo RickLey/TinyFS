@@ -5,6 +5,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 import com.chunkserver.ChunkServer;
 import com.client.FileHandle;
@@ -34,6 +35,8 @@ public class Master implements Runnable {
 	private static HashMap<String, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
 	private static HashMap<String, String> chunkLocations; //Map from chunkHandle to chunkServer IPs
 	private static HashMap<String, Integer> remainingChunkSpace; // How much space is left in last chunk of a file
+
+	private static ReentrantLock namespaceLock;
 	
 	/*ArrayList<Socket> chunkserverConnections;
 	int currChunkserver;*/
@@ -42,8 +45,6 @@ public class Master implements Runnable {
 	//Locks
 
 	private Socket connection;
-	
-	
 	
 	public Master(Socket socket)
 	{
@@ -54,6 +55,8 @@ public class Master implements Runnable {
 			remainingChunkSpace = new HashMap<String, Integer>();
 			namespace.add("/");
 			//currChunkserver = 0;
+
+			namespaceLock = new ReentrantLock();
 
 			chunkserver = new ChunkServer();
 		}
@@ -70,6 +73,8 @@ public class Master implements Runnable {
 	 * "CSCI485"), CreateDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals CreateDir(String src, String dirname) {
+		namespaceLock.lock();
+
 		int parentIndex = namespace.indexOf(src);
 		if(parentIndex < 0)
 		{
@@ -89,6 +94,9 @@ public class Master implements Runnable {
 		}
 		namespace.add(index, fullPath);
 		// No chunkLists entry because directories do not consist of chunks
+
+		namespaceLock.unlock();
+
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -100,6 +108,8 @@ public class Master implements Runnable {
 	 * Example usage: DeleteDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals DeleteDir(String src, String dirname) {
+		namespaceLock.lock();
+
 		int parentIndex = namespace.indexOf(src);
 		if(parentIndex < 0)
 		{
@@ -119,6 +129,9 @@ public class Master implements Runnable {
 		}
 		
 		namespace.remove(dirIndex);
+
+		namespaceLock.unlock();
+
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -131,14 +144,18 @@ public class Master implements Runnable {
 	 * "/Shahram/CSCI485" to "/Shahram/CSCI550"
 	 */
 	public FSReturnVals RenameDir(String src, String NewName) {
+		namespaceLock.lock();
+
 		int index = namespace.indexOf(src + "/");
 		if(index < 0)
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.SrcDirNotExistent;
 		}
 		
 		if(namespace.indexOf(NewName + "/") >= 0)
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.DestDirExists;
 		}
 		
@@ -166,7 +183,9 @@ public class Master implements Runnable {
 			}
 			temp = namespace.get(index);
 		}
-		
+
+		namespaceLock.unlock();
+
 		// Must sort at the end to maintain canonical order? -- shouldn't be necessary
 		// as they will all still be clustered
 		return ClientFS.FSReturnVals.Success;
@@ -180,10 +199,13 @@ public class Master implements Runnable {
 	 * Example usage: ListDir("/Shahram/CSCI485")
 	 */
 	public String[] ListDir(String tgt) {
+		namespaceLock.lock();
+
 		// Iterate through ordered list until there's a prefix that is not the target dir
 		int index = namespace.indexOf(tgt + "/");
 		if(index < 0)
 		{
+			namespaceLock.unlock();
 			return null;
 		}
 		
@@ -212,6 +234,8 @@ public class Master implements Runnable {
 			}
 
 		}
+
+		namespaceLock.unlock();
 				
 		if(result.size() == 0)
 		{
@@ -458,6 +482,43 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
+	/*	RENAME_DIR_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	src size
+	 * 	12-15	newname size
+	 * 	...		src
+	 * 	...		newname
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleRenameDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int srcSize = in.readInt();
+		int newnameSize = in.readInt();
+
+		byte[] srcBytes = new byte[srcSize];
+		int bytesRead = 0;
+		while (bytesRead < srcSize) {
+			bytesRead += in.read(srcBytes, bytesRead, srcSize - bytesRead);
+		}
+		String src = new String(srcBytes);
+
+		byte[] newnameBytes = new byte[newnameSize];
+		bytesRead = 0;
+		while (bytesRead < newnameSize) {
+			bytesRead += in.read(newnameBytes, bytesRead, newnameSize - bytesRead);
+		}
+		String newname = new String(newnameBytes);
+
+		FSReturnVals returnVal = RenameDir(src, newname);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
 	/*	LIST_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
@@ -528,7 +589,7 @@ public class Master implements Runnable {
 						break;
 
 					case RENAME_DIR_CMD:
-						// TODO
+						handleRenameDirCmd(in, out);
 						break;
 
 					case LIST_DIR_CMD:

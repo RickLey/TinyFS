@@ -134,8 +134,30 @@ public class ClientFS {
 	 * "/Shahram/CSCI485" to "/Shahram/CSCI550"
 	 */
 	public FSReturnVals RenameDir(String src, String NewName) {
-//		return master.RenameDir(src, NewName);
-		return FSReturnVals.NotImplemented;
+		byte[] srcBytes = src.getBytes();
+		byte[] newnameBytes = NewName.getBytes();
+
+		try {
+			int outPacketSize = 16 + srcBytes.length + newnameBytes.length;
+			out.writeInt(outPacketSize);
+			out.writeInt(Master.RENAME_DIR_CMD);
+			out.writeInt(srcBytes.length);
+			out.writeInt(newnameBytes.length);
+			out.write(srcBytes);
+			out.write(newnameBytes);
+			out.flush();
+
+			int inPacketSize = in.readInt();
+			int retValue = in.readInt();
+			if (FSReturnVals.valueOf(retValue) == FSReturnVals.Fail) {
+				System.out.println("Master returned FAIL");
+			}
+			return FSReturnVals.valueOf(retValue);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return FSReturnVals.Fail;
 	}
 
 	/**
@@ -161,7 +183,6 @@ public class ClientFS {
 			int inPacketSize = in.readInt();
 
 			if (inPacketSize == 4) {
-				System.out.println("Listings is empty");
 				return null;
 			}
 
@@ -176,11 +197,6 @@ public class ClientFS {
 					bytesRead += in.read(listing, bytesRead, listingSize - bytesRead);
 				}
 				listings[i] = new String(listing);
-			}
-
-			System.out.println("Listings:");
-			for (int i = 0 ; i < numListings ; i++) {
-				System.out.println(" - " + listings[i]);
 			}
 
 			return listings;
