@@ -2,9 +2,7 @@ package com.client;
 
 import com.master.Master;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,20 +49,17 @@ public class ClientFS {
 	}
 
 	private Socket socket;
-	private ObjectOutputStream outStream;
-	private ObjectInputStream inStream;
-	private Master master;
+	private DataOutputStream out;
+	private DataInputStream in;
 
 	public ClientFS() {
-		/*try {
+		try {
 			socket = new Socket(Master.HOST, Master.PORT);
-			outStream = new ObjectOutputStream(socket.getOutputStream());
-			inStream = new ObjectInputStream(socket.getInputStream());
+			out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+			in = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
 		} catch (IOException ioe) {
 			ioe.printStackTrace();
-		}*/
-		
-		master = new Master();
+		}
 	}
 
 	/**
@@ -76,7 +71,27 @@ public class ClientFS {
 	 * "CSCI485"), CreateDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals CreateDir(String src, String dirname) {
-		return master.CreateDir(src, dirname);
+		byte[] srcBytes = src.getBytes();
+		byte[] dirnameBytes = dirname.getBytes();
+
+		try {
+			int outPacketSize = 16 + srcBytes.length + dirnameBytes.length;
+			out.writeInt(outPacketSize);
+			out.writeInt(Master.CREATE_DIR_CMD);
+			out.writeInt(srcBytes.length);
+			out.writeInt(dirnameBytes.length);
+			out.write(srcBytes);
+			out.write(dirnameBytes);
+			out.flush();
+
+			int inPacketSize = in.readInt();
+			int retValue = in.readInt();
+			return FSReturnVals.valueOf(retValue);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return FSReturnVals.Fail;
 	}
 
 	/**
@@ -87,7 +102,8 @@ public class ClientFS {
 	 * Example usage: DeleteDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals DeleteDir(String src, String dirname) {
-		return  master.DeleteDir(src, dirname);
+//		return  master.DeleteDir(src, dirname);
+		return FSReturnVals.NotImplemented;
 	}
 
 	/**
@@ -99,7 +115,8 @@ public class ClientFS {
 	 * "/Shahram/CSCI485" to "/Shahram/CSCI550"
 	 */
 	public FSReturnVals RenameDir(String src, String NewName) {
-		return master.RenameDir(src, NewName);
+//		return master.RenameDir(src, NewName);
+		return FSReturnVals.NotImplemented;
 	}
 
 	/**
@@ -111,7 +128,37 @@ public class ClientFS {
 	 */
 	public String[] ListDir(String tgt) {
 		// Iterate through ordered list until there's a prefix that is not the target dir
-		return master.ListDir(tgt);
+
+		byte[] tgtBytes = tgt.getBytes();
+
+		try {
+			int outPacketSize = 12 + tgtBytes.length;
+			out.writeInt(outPacketSize);
+			out.writeInt(Master.LIST_DIR_CMD);
+			out.writeInt(tgtBytes.length);
+			out.write(tgtBytes);
+			out.flush();
+
+			int inPacketSize = in.readInt();
+			int numListings = in.readInt();
+			int bytesRead = 0;
+			String[] listings = new String[numListings];
+			for (int i = 0 ; i < numListings ; i++) {
+				int listingSize = in.readInt();
+				byte[] listing = new byte[listingSize];
+				bytesRead = 0;
+				while (bytesRead < listingSize) {
+					bytesRead += in.read(listing, bytesRead, listingSize - bytesRead);
+				}
+				listings[i] = new String(listing);
+			}
+
+			return listings;
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return null;
 	}
 
 	/**
@@ -126,7 +173,8 @@ public class ClientFS {
 		// Master will insert filename into ordered list
 		
 		// Files are handled the same as directories. All directories end with a /
-		return master.CreateFile(tgtdir, filename);
+//		return master.CreateFile(tgtdir, filename);
+		return FSReturnVals.NotImplemented;
 	}
 
 	/**
@@ -137,7 +185,8 @@ public class ClientFS {
 	 * Example usage: DeleteFile("/Shahram/CSCI485/Lecture1/", "Intro.pptx")
 	 */
 	public FSReturnVals DeleteFile(String tgtdir, String filename) {
-		return master.DeleteFile(tgtdir, filename);
+//		return master.DeleteFile(tgtdir, filename);
+		return FSReturnVals.NotImplemented;
 	}
 
 	/**
@@ -149,7 +198,8 @@ public class ClientFS {
 	 */
 	public FSReturnVals OpenFile(String FilePath, FileHandle ofh) {
 		// Return the FilePath as a file handle. Vacuous.
-		return master.OpenFile(FilePath, ofh);
+//		return master.OpenFile(FilePath, ofh);
+		return FSReturnVals.NotImplemented;
 	}
 
 	/**
@@ -158,7 +208,8 @@ public class ClientFS {
 	 * Example usage: CloseFile(FH1)
 	 */
 	public FSReturnVals CloseFile(FileHandle ofh) {
-		return master.CloseFile(ofh);
+//		return master.CloseFile(ofh);
+		return FSReturnVals.NotImplemented;
 	}
 
 }
