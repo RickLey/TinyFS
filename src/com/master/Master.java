@@ -728,7 +728,7 @@ public class Master implements Runnable {
 	}
 
 	public static void main(String[] args) {
-		new Master(null);
+		Master intialMaster = new Master(null);
 
 		try {
 			ServerSocket server = new ServerSocket(Master.PORT);
