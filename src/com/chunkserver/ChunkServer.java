@@ -1,12 +1,7 @@
 package com.chunkserver;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.PrintWriter;
-import java.io.RandomAccessFile;
+import java.io.*;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -15,6 +10,7 @@ import java.util.Arrays;
 
 import com.client.Client;
 import com.interfaces.ChunkServerInterface;
+import com.master.Master;
 
 /**
  * implementation of interfaces at the chunkserver side
@@ -65,6 +61,20 @@ public class ChunkServer implements ChunkServerInterface {
 			
 			Arrays.sort(cntrs);
 			counter = cntrs[cntrs.length - 1];
+		}
+
+		// register with master
+		try {
+			Socket masterSocket = new Socket(Master.HOST, Master.PORT);
+			DataOutputStream out = new DataOutputStream(new BufferedOutputStream(masterSocket.getOutputStream()));
+			byte[] host = InetAddress.getLocalHost().getHostAddress().getBytes();
+			out.writeInt(12 + host.length);
+			out.writeInt(Master.REGISTER_CHUNKSERVER_CMD);
+			out.writeInt(host.length);
+			out.write(host);
+			out.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 	

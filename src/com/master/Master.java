@@ -25,11 +25,7 @@ public class Master implements Runnable {
 	public static final int DELETE_FILE_CMD = 106;
 	public static final int OPEN_FILE_CMD = 107;
 	public static final int CLOSE_FILE_CMD = 108;
-
-	//Ordered list of FileHandles(String)
-	//Map from FileHandle to list of chunkHandle's
-	//Map from chunkHandle to chunkServer
-	//Locks
+	public static final int REGISTER_CHUNKSERVER_CMD = 109;
 	
 	private static ArrayList<String> namespace; //Ordered list of FileHandles(String)
 	private static HashMap<String, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
@@ -37,12 +33,8 @@ public class Master implements Runnable {
 	private static HashMap<String, Integer> remainingChunkSpace; // How much space is left in last chunk of a file
 
 	private static ReentrantLock namespaceLock;
-	
-	/*ArrayList<Socket> chunkserverConnections;
-	int currChunkserver;*/
 
-	private static ChunkServer chunkserver;
-	//Locks
+	private static HashMap<String, Socket> chunkservers;
 
 	private Socket connection;
 	
@@ -54,11 +46,10 @@ public class Master implements Runnable {
 			chunkLocations = new HashMap<String, String>();
 			remainingChunkSpace = new HashMap<String, Integer>();
 			namespace.add("/");
-			//currChunkserver = 0;
 
 			namespaceLock = new ReentrantLock();
 
-			chunkserver = new ChunkServer();
+			chunkservers = new HashMap<String, Socket>();
 		}
 
 		connection = socket;
@@ -400,8 +391,9 @@ public class Master implements Runnable {
 			}
 			Read the string handle back
 			*/
-			
-			String chunkHandle = chunkserver.createChunk();
+
+			String chunkHandle = ""; // TODO: create new chunk and get chunk handle
+//			String chunkHandle = chunkserver.createChunk();
 			chunkLists.get(FileHandle).add(chunkHandle); // add the handle to the list for this file
 			remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize); // reset the remaining space to be chunksize - payloadsize
 			return chunkHandle;
@@ -645,6 +637,22 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
+	/*	REGISTER_CHUNKSERVER_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	host size
+	 * 	...		host
+	 *
+	 * 	(no return packet)
+	 *
+	 */
+	public void handleRegisterChunkserverCmd(DataInputStream in, Socket socket) throws IOException {
+		int hostSize = in.readInt();
+		String host = readString(in, hostSize);
+		chunkservers.put(host, socket);
+	}
+
 	@Override
 	public void run() {
 		try {
@@ -691,6 +699,10 @@ public class Master implements Runnable {
 					case CLOSE_FILE_CMD:
 						handleCloseFileCmd(in, out);
 						break;
+
+					case REGISTER_CHUNKSERVER_CMD:
+						handleRegisterChunkserverCmd(in, connection);
+						break;
 				}
 
 				out.flush();
@@ -701,7 +713,7 @@ public class Master implements Runnable {
 	}
 
 	public static void main(String[] args) {
-		Master initialMaster = new Master(null);
+		new Master(null);
 
 		try {
 			ServerSocket server = new ServerSocket(Master.PORT);
