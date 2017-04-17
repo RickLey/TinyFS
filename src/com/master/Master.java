@@ -10,7 +10,8 @@ import com.chunkserver.ChunkServer;
 import com.client.FileHandle;
 import com.client.ClientFS;
 import com.client.ClientFS.FSReturnVals;
-public class Master {
+
+public class Master implements Runnable {
 
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
@@ -29,29 +30,35 @@ public class Master {
 	//Map from chunkHandle to chunkServer
 	//Locks
 	
-	ArrayList<String> namespace; //Ordered list of FileHandles(String)
-	HashMap<String, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
-	HashMap<String, String> chunkLocations; //Map from chunkHandle to chunkServer IPs
-	HashMap<String, Integer> remainingChunkSpace; // How much space is left in last chunk of a file
+	private static ArrayList<String> namespace; //Ordered list of FileHandles(String)
+	private static HashMap<String, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
+	private static HashMap<String, String> chunkLocations; //Map from chunkHandle to chunkServer IPs
+	private static HashMap<String, Integer> remainingChunkSpace; // How much space is left in last chunk of a file
 	
 	/*ArrayList<Socket> chunkserverConnections;
 	int currChunkserver;*/
-	
-	ChunkServer chunkserver;
+
+	private static ChunkServer chunkserver;
 	//Locks
+
+	private Socket connection;
 	
 	
 	
-	public Master()
+	public Master(Socket socket)
 	{
-		namespace = new ArrayList<String>();
-		chunkLists = new HashMap<String, ArrayList<String>>();
-		chunkLocations = new HashMap<String, String>();
-		remainingChunkSpace = new HashMap<String, Integer>();
-		namespace.add("/");
-		//currChunkserver = 0;
-		
-		chunkserver = new ChunkServer();
+		if (namespace == null) {
+			namespace = new ArrayList<String>();
+			chunkLists = new HashMap<String, ArrayList<String>>();
+			chunkLocations = new HashMap<String, String>();
+			remainingChunkSpace = new HashMap<String, Integer>();
+			namespace.add("/");
+			//currChunkserver = 0;
+
+			chunkserver = new ChunkServer();
+		}
+
+		connection = socket;
 	}
 	
 	/**
@@ -414,6 +421,43 @@ public class Master {
 		out.writeInt(returnVal.getValue());
 	}
 
+	/*	DELETE_DIR_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	src size
+	 * 	12-15	dirname size
+	 * 	...		src
+	 * 	...		dirname
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		return value
+	 *
+	 */
+	public void handleDeleteDirCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int srcSize = in.readInt();
+		int dirnameSize = in.readInt();
+
+		byte[] srcBytes = new byte[srcSize];
+		int bytesRead = 0;
+		while (bytesRead < srcSize) {
+			bytesRead += in.read(srcBytes, bytesRead, srcSize - bytesRead);
+		}
+		String src = new String(srcBytes);
+
+		byte[] dirnameBytes = new byte[dirnameSize];
+		bytesRead = 0;
+		while (bytesRead < dirnameSize) {
+			bytesRead += in.read(dirnameBytes, bytesRead, dirnameSize - bytesRead);
+		}
+		String dirname = new String(dirnameBytes);
+
+		FSReturnVals returnVal = DeleteDir(src, dirname);
+
+		out.writeInt(8);
+		out.writeInt(returnVal.getValue());
+	}
+
 	/*	LIST_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
@@ -442,79 +486,95 @@ public class Master {
 
 		String[] listings = ListDir(target);
 
-		int returnPacketSize = 8;
-		for (int i = 0 ; i < listings.length ; i++) {
-			returnPacketSize += 4 + listings[i].getBytes().length;
-		}
-		out.writeInt(returnPacketSize);
+		if (listings == null) {
+			out.writeInt(4);
+		} else {
+			int returnPacketSize = 8;
+			for (int i = 0 ; i < listings.length ; i++) {
+				returnPacketSize += 4 + listings[i].getBytes().length;
+			}
+			out.writeInt(returnPacketSize);
 
-		out.writeInt(listings.length);
-		for (int i = 0 ; i < listings.length ; i++) {
-			byte[] listingBytes = listings[i].getBytes();
-			out.writeInt(listingBytes.length);
-			out.write(listingBytes);
+			out.writeInt(listings.length);
+			for (int i = 0 ; i < listings.length ; i++) {
+				byte[] listingBytes = listings[i].getBytes();
+				out.writeInt(listingBytes.length);
+				out.write(listingBytes);
+			}
+		}
+	}
+
+	@Override
+	public void run() {
+		try {
+			DataOutputStream out = new DataOutputStream(new BufferedOutputStream(connection.getOutputStream()));
+			DataInputStream in = new DataInputStream(new BufferedInputStream(connection.getInputStream()));
+
+			while (!connection.isClosed()) {
+				while (in.available() <= 0);
+				int packetSize = in.readInt();
+				if (packetSize == -1) {
+					break;
+				}
+
+				int command = in.readInt();
+				switch (command) {
+					case CREATE_DIR_CMD:
+						handleCreateDirCmd(in, out);
+						break;
+
+					case DELETE_DIR_CMD:
+						handleDeleteDirCmd(in, out);
+						break;
+
+					case RENAME_DIR_CMD:
+						// TODO
+						break;
+
+					case LIST_DIR_CMD:
+						handleListDirCmd(in, out);
+						break;
+
+					case CREATE_FILE_CMD:
+						// TODO
+						break;
+
+					case DELETE_FILE_CMD:
+						// TODO
+						break;
+
+					case OPEN_FILE_CMD:
+						// TODO
+						break;
+
+					case CLOSE_FILE_CMD:
+						// TODO
+						break;
+				}
+
+				out.flush();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 
 	public static void main(String[] args) {
-		Master master = new Master();
+		Master initialMaster = new Master(null);
 
 		try {
 			ServerSocket server = new ServerSocket(Master.PORT);
 
 			Socket connection = null;
-			DataOutputStream out = null;
-			DataInputStream in = null;
+
+			ArrayList<Thread> threads = new ArrayList<Thread>();
 
 			while (true) {
 				connection = server.accept();
-				out = new DataOutputStream(new BufferedOutputStream(connection.getOutputStream()));
-				in = new DataInputStream(new BufferedInputStream(connection.getInputStream()));
-
-				while (!connection.isClosed()) {
-					while (in.available() <= 0);
-					int packetSize = in.readInt();
-					if (packetSize == -1) {
-						break;
-					}
-
-					int command = in.readInt();
-					switch (command) {
-						case CREATE_DIR_CMD:
-							master.handleCreateDirCmd(in, out);
-							break;
-
-						case DELETE_DIR_CMD:
-							// TODO
-							break;
-
-						case RENAME_DIR_CMD:
-							// TODO
-							break;
-
-						case LIST_DIR_CMD:
-							master.handleListDirCmd(in, out);
-							break;
-
-						case CREATE_FILE_CMD:
-							// TODO
-							break;
-
-						case DELETE_FILE_CMD:
-							// TODO
-							break;
-
-						case OPEN_FILE_CMD:
-							// TODO
-							break;
-
-						case CLOSE_FILE_CMD:
-							// TODO
-							break;
-					}
-
-					out.flush();
-				}
+				Master master = new Master(connection);
+				Thread thread = new Thread(master);
+				thread.start();
+				threads.add(thread);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();

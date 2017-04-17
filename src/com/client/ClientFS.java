@@ -102,8 +102,27 @@ public class ClientFS {
 	 * Example usage: DeleteDir("/Shahram/CSCI485/", "Lecture1")
 	 */
 	public FSReturnVals DeleteDir(String src, String dirname) {
-//		return  master.DeleteDir(src, dirname);
-		return FSReturnVals.NotImplemented;
+		byte[] srcBytes = src.getBytes();
+		byte[] dirnameBytes = dirname.getBytes();
+
+		try {
+			int outPacketSize = 16 + srcBytes.length + dirnameBytes.length;
+			out.writeInt(outPacketSize);
+			out.writeInt(Master.DELETE_DIR_CMD);
+			out.writeInt(srcBytes.length);
+			out.writeInt(dirnameBytes.length);
+			out.write(srcBytes);
+			out.write(dirnameBytes);
+			out.flush();
+
+			int inPacketSize = in.readInt();
+			int retValue = in.readInt();
+			return FSReturnVals.valueOf(retValue);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		return FSReturnVals.Fail;
 	}
 
 	/**
@@ -140,6 +159,12 @@ public class ClientFS {
 			out.flush();
 
 			int inPacketSize = in.readInt();
+
+			if (inPacketSize == 4) {
+				System.out.println("Listings is empty");
+				return null;
+			}
+
 			int numListings = in.readInt();
 			int bytesRead = 0;
 			String[] listings = new String[numListings];
@@ -151,6 +176,11 @@ public class ClientFS {
 					bytesRead += in.read(listing, bytesRead, listingSize - bytesRead);
 				}
 				listings[i] = new String(listing);
+			}
+
+			System.out.println("Listings:");
+			for (int i = 0 ; i < numListings ; i++) {
+				System.out.println(" - " + listings[i]);
 			}
 
 			return listings;
