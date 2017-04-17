@@ -1,6 +1,12 @@
 package com.master;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,7 +15,7 @@ import com.chunkserver.ChunkServer;
 import com.client.FileHandle;
 import com.client.ClientFS;
 import com.client.ClientFS.FSReturnVals;
-public class Master {
+public class Master implements Serializable{
 
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
@@ -39,9 +45,21 @@ public class Master {
 	ChunkServer chunkserver;
 	//Locks
 	
+	public Master()
+	{
+		initializeDataStructures();
+	}
 	
 	
 	public Master(int portNumber, String hostname)
+	{
+		initializeDataStructures();
+		startServer(portNumber, hostname);
+		//Write networking
+		//currChunkserver = 0;
+	}
+	
+	private void initializeDataStructures()
 	{
 		namespace = new ArrayList<String>();
 		chunkLists = new HashMap<String, ArrayList<String>>();
@@ -50,8 +68,14 @@ public class Master {
 		namespace.add("/");
 		//currChunkserver = 0;
 		//Write networking
+
 		
 		chunkserver = new ChunkServer();
+	}
+	
+	public void startServer(int portNumber, String hostname)
+	{
+		
 	}
 	
 	/**
@@ -311,7 +335,9 @@ public class Master {
 	}
 
 	
-	boolean VerifyFileHandle(String fileHandle)
+
+	
+	public boolean VerifyFileHandle(String fileHandle)
 	{
 		return !chunkLists.containsKey(fileHandle);
 	}
@@ -377,10 +403,41 @@ public class Master {
 		}
 	}
 	
+	private void writeObject(java.io.ObjectOutputStream out) throws IOException
+	{
+		/*out.writeObject(namespace);
+		out.writeObject(chunkLists);
+		out.writeObject(chunkLocations);
+		out.writeObject(remainingChunkSpace);*/
+		out.defaultWriteObject();
+	}
+	private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException
+	{
+		/*namespace = (ArrayList<String>) in.readObject();
+		chunkLists = (HashMap<String, ArrayList<String>>) in.readObject();
+		chunkLocations = (HashMap<String, String>) in.readObject();
+		remainingChunkSpace = (HashMap<String, Integer>) in.readObject();*/
+		in.defaultReadObject();
+	}
+	private void readObjectNoData() throws ObjectStreamException
+	{
+		 initializeDataStructures();
+	}
+	
 	
 	public static void main(String[] args) {
-		new Master(PORT, HOST);
-
+		FileInputStream fis;
+		try {
+			fis = new FileInputStream("state.txt");
+			ObjectInputStream ois = new ObjectInputStream(fis);
+			Master master = (Master) ois.readObject();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 }
