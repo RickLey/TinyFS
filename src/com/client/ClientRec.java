@@ -59,16 +59,7 @@ public class ClientRec {
 		RecordID.chunkHandle = chunkHandle;
 		RecordID.chunkOffset = offset;
 		
-		// Calls writeChunk with chunk handle, offset, payload. Must write
-		// The length of the record (2 bytes) right before the record itself
-		// And a byte to indicate (in)valid
-		// Populates RID
-		// Returns returnval
 		
-		
-		
-		
-		return null;
 		return ClientFS.FSReturnVals.Success;
 	}
 
