@@ -40,6 +40,8 @@ public class Master implements Runnable {
 
 	private Socket connection;
 	
+	public ChunkServer chunkserver;
+	
 	public Master(Socket socket)
 	{
 		if (namespace == null) {

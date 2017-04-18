@@ -63,15 +63,10 @@ public class Client implements ClientInterface {
 	/**
 	 * Initialize the client  FileNotFoundException
 	 */
-	public Client(){
+	public Client(String hostname, int port){
 		if (ClientSocket != null) return; //The client is already connected
 		try {
-			BufferedReader binput = new BufferedReader(new FileReader(ChunkServer.ClientConfigFile));
-			String port = binput.readLine();
-			port = port.substring( port.indexOf(':')+1 );
-			ServerPort = Integer.parseInt(port);
-			
-			ClientSocket = new Socket("127.0.0.1", ServerPort);
+			ClientSocket = new Socket(hostname, port);
 			WriteOutput = new ObjectOutputStream(ClientSocket.getOutputStream());
 			ReadInput = new ObjectInputStream(ClientSocket.getInputStream());
 		}catch (FileNotFoundException e) {
