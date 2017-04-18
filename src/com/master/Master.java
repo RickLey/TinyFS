@@ -38,6 +38,8 @@ public class Master implements Serializable, Runnable{
 	public static final int OPEN_FILE_CMD = 107;
 	public static final int CLOSE_FILE_CMD = 108;
 	public static final int REGISTER_CHUNKSERVER_CMD = 109;
+	public static final int VERIFY_FILE_HANDLE_CMD = 110;
+
 	public static final String stateFile = "state";
 	
 	private static ArrayList<String> namespace; //Ordered list of FileHandles(String)
@@ -698,6 +700,27 @@ public class Master implements Serializable, Runnable{
 		chunkserverQueue.addLast(host);
 	}
 
+	/*	VERIFY_FILE_HANDLE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filehandle size
+	 * 	...		filehandle
+	 *
+	 * 	0-3		packet size
+	 * 	4		boolean
+	 *
+	 */
+	public void handleVerifyFileHandleCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filehandleSize = in.readInt();
+		String filehandle = readString(in, filehandleSize);
+
+		boolean success = VerifyFileHandle(filehandle);
+
+		out.writeInt(5);
+		out.writeBoolean(success);
+	}
+
 	@Override
 	public void run() {
 		try {
@@ -747,6 +770,10 @@ public class Master implements Serializable, Runnable{
 
 					case REGISTER_CHUNKSERVER_CMD:
 						handleRegisterChunkserverCmd(in, connection);
+						break;
+
+					case VERIFY_FILE_HANDLE_CMD:
+						handleVerifyFileHandleCmd(in, out);
 						break;
 				}
 
