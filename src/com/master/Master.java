@@ -57,20 +57,6 @@ public class Master implements Serializable, Runnable{
 
 	private Socket connection;
 	
-	public Master()
-	{
-		initializeDataStructures();
-	}
-	
-	
-	public Master(int portNumber, String hostname)
-	{
-		initializeDataStructures();
-		startServer(portNumber, hostname);
-		//Write networking
-		//currChunkserver = 0;
-	}
-	
 	private void initializeDataStructures()
 	{
 		namespace = new ArrayList<String>();
@@ -78,25 +64,22 @@ public class Master implements Serializable, Runnable{
 		chunkLocations = new HashMap<String, String>();
 		remainingChunkSpace = new HashMap<String, Integer>();
 		namespace.add("/");
-		//currChunkserver = 0;
-		//Write networking
-
-		namespaceLock = new ReentrantLock();
 		
-		chunkserver = new ChunkServer();
 	}
 	public Master(Socket socket)
 	{
-		if (namespace == null) {
-			initializeDataStructures();
+		if(namespace == null)
+		{
+			namespaceLock = new ReentrantLock();
+			chunkserver = new ChunkServer();
+			try {
+				loadState();
+			} catch (ClassNotFoundException | IOException e) {
+				initializeDataStructures();
+			}
 		}
-
-		connection = socket;
-	}
-	
-	public void startServer(int portNumber, String hostname)
-	{
 		
+		connection = socket;
 	}
 	
 	/**
@@ -454,26 +437,6 @@ public class Master implements Serializable, Runnable{
 			return chunkHandle;
 		}
 	}	
-	private void writeObject(java.io.ObjectOutputStream out) throws IOException
-	{
-		out.writeObject(namespace);
-		out.writeObject(chunkLists);
-		out.writeObject(chunkLocations);
-		out.writeObject(remainingChunkSpace);
-		//out.defaultWriteObject();
-	}
-	private void readObject(java.io.ObjectInputStream in) throws IOException, ClassNotFoundException
-	{
-		namespace = (ArrayList<String>) in.readObject();
-		chunkLists = (HashMap<String, ArrayList<String>>) in.readObject();
-		chunkLocations = (HashMap<String, String>) in.readObject();
-		remainingChunkSpace = (HashMap<String, Integer>) in.readObject();
-		//in.defaultReadObject();
-	}
-	private void readObjectNoData() throws ObjectStreamException
-	{
-		 initializeDataStructures();
-	}
 	
 	private String readString(DataInputStream in, int size) throws IOException {
 		byte[] bytes = new byte[size];
@@ -774,12 +737,29 @@ public class Master implements Serializable, Runnable{
 		try {
 			fos = new FileOutputStream("state.txt");
 			oos = new ObjectOutputStream(fos);
-			oos.writeObject(this);
+			oos.writeObject(namespace);
+			oos.writeObject(chunkLists);
+			oos.writeObject(chunkLocations);
+			oos.writeObject(remainingChunkSpace);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
+	}
+	
+	private void loadState() throws IOException, ClassNotFoundException
+	{
+		FileInputStream fis;
+		ObjectInputStream ois;
+		fis = new FileInputStream("state.txt");
+		ois = new ObjectInputStream(fis);
+		namespace = (ArrayList<String>) ois.readObject();
+		chunkLists = (HashMap<String, ArrayList<String>>) ois.readObject();
+		chunkLocations = (HashMap<String, String>) ois.readObject();
+		remainingChunkSpace = (HashMap<String, Integer>) ois.readObject();
+		System.out.println(namespace.toString());
+		System.out.println(chunkLists.toString());
+		System.out.println(remainingChunkSpace);
 	}
 
 	public static void main(String[] args) {
@@ -802,28 +782,6 @@ public class Master implements Serializable, Runnable{
 		} catch (IOException e) {
 			e.printStackTrace();
 			return;
-		}
-	}
-	
-	public static void main(String[] args) {
-		FileInputStream fis;
-		Master master;
-		try {
-			fis = new FileInputStream("state.txt");
-			System.out.println("Found state File");
-			ObjectInputStream ois = new ObjectInputStream(fis);
-			master = (Master) ois.readObject();
-			System.out.println(master.namespace.toString());
-		} catch (FileNotFoundException e) {
-			master = new Master();
-			master.CreateDir("/", "testDir");
-			master.CreateFile("/testDir/", "testfile");
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 	}
 
