@@ -456,7 +456,8 @@ public class Master implements Serializable, Runnable{
 		return new String(bytes);
 	}
 
-	/*	CREATE_DIR_CMD Packet Layout
+	/**
+	 *  CREATE_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -482,7 +483,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	DELETE_DIR_CMD Packet Layout
+	/**
+	 *  DELETE_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -508,7 +510,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	RENAME_DIR_CMD Packet Layout
+	/**
+	 *  RENAME_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -534,7 +537,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	LIST_DIR_CMD Packet Layout
+	/**
+	 *  LIST_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -575,7 +579,8 @@ public class Master implements Serializable, Runnable{
 		}
 	}
 
-	/*	CREATE_FILE_CMD Packet Layout
+	/**
+	 *  CREATE_FILE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -601,7 +606,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	DELETE_FILE_CMD Packet Layout
+	/**
+	 *  DELETE_FILE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -627,7 +633,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	OPEN_FILE_CMD Packet Layout
+	/**
+	 *  OPEN_FILE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -660,7 +667,8 @@ public class Master implements Serializable, Runnable{
 		}
 	}
 
-	/*	CLOSE_FILE_CMD Packet Layout
+	/**
+	 *  CLOSE_FILE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -684,7 +692,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	REGISTER_CHUNKSERVER_CMD Packet Layout
+	/**
+	 *  REGISTER_CHUNKSERVER_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -701,7 +710,8 @@ public class Master implements Serializable, Runnable{
 		chunkserverQueue.addLast(host);
 	}
 
-	/*	VERIFY_FILE_HANDLE_CMD Packet Layout
+	/**
+	 *  VERIFY_FILE_HANDLE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -722,7 +732,8 @@ public class Master implements Serializable, Runnable{
 		out.writeBoolean(success);
 	}
 
-	/*	GET_HANDLE_FOR_APPEND_CMD Packet Layout
+	/**
+	 *  GET_HANDLE_FOR_APPEND_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
