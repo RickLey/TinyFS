@@ -41,6 +41,7 @@ public class Master implements Serializable, Runnable{
 	public static final int VERIFY_FILE_HANDLE_CMD = 110;
 	public static final int GET_HANDLE_FOR_APPEND_CMD = 111;
 	public static final int GET_FIRST_CHUNK_HANDLE_FOR_FILE_CMD = 112;
+	public static final int GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD = 113;
 
 	public static final String stateFile = "state";
 	
@@ -794,6 +795,35 @@ public class Master implements Serializable, Runnable{
 		out.write(chunkHandleBytes);
 	}
 
+	/**
+	 *  GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filehandle size
+	 * 	...		filehandle
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		chunkhandle size
+	 * 	...		chunkhandle
+	 *
+	 */
+	public void handleGetLastChunkHandleForFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filehandleSize = in.readInt();
+		String filehandle = readString(in, filehandleSize);
+
+		String chunkHandle = GetLastChunkHandleOfAFile(filehandle);
+		if (chunkHandle == null) {
+			out.writeInt(4);
+			return;
+		}
+
+		byte[] chunkHandleBytes = chunkHandle.getBytes();
+		out.writeInt(8 + chunkHandleBytes.length);
+		out.writeInt(chunkHandleBytes.length);
+		out.write(chunkHandleBytes);
+	}
+
 	@Override
 	public void run() {
 		try {
@@ -855,6 +885,10 @@ public class Master implements Serializable, Runnable{
 
 					case GET_FIRST_CHUNK_HANDLE_FOR_FILE_CMD:
 						handleGetFirstChunkHandleForFileCmd(in, out);
+						break;
+
+					case GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD:
+						handleGetLastChunkHandleForFileCmd(in, out);
 						break;
 				}
 
