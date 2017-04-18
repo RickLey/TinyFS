@@ -1,6 +1,18 @@
 package com.master;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayDeque;
@@ -12,8 +24,7 @@ import com.chunkserver.ChunkServer;
 import com.client.FileHandle;
 import com.client.ClientFS;
 import com.client.ClientFS.FSReturnVals;
-
-public class Master implements Runnable {
+public class Master implements Serializable, Runnable{
 
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
@@ -40,21 +51,28 @@ public class Master implements Runnable {
 
 	private Socket connection;
 	
+	private void initializeDataStructures()
+	{
+		namespace = new ArrayList<String>();
+		chunkLists = new HashMap<String, ArrayList<String>>();
+		chunkLocations = new HashMap<String, String>();
+		remainingChunkSpace = new HashMap<String, Integer>();
+		namespace.add("/");
+		chunkservers = new HashMap<String, Socket>();
+		chunkserverQueue = new ArrayDeque<String>();
+	}
 	public Master(Socket socket)
 	{
-		if (namespace == null) {
-			namespace = new ArrayList<String>();
-			chunkLists = new HashMap<String, ArrayList<String>>();
-			chunkLocations = new HashMap<String, String>();
-			remainingChunkSpace = new HashMap<String, Integer>();
-			namespace.add("/");
-
+		if(namespace == null)
+		{
 			namespaceLock = new ReentrantLock();
-
-			chunkservers = new HashMap<String, Socket>();
-			chunkserverQueue = new ArrayDeque<String>();
+			try {
+				loadState();
+			} catch (ClassNotFoundException | IOException e) {
+				initializeDataStructures();
+			}
 		}
-
+		
 		connection = socket;
 	}
 	
@@ -88,6 +106,8 @@ public class Master implements Runnable {
 		}
 		namespace.add(index, fullPath);
 		// No chunkLists entry because directories do not consist of chunks
+		
+		saveState();
 
 		namespaceLock.unlock();
 
@@ -123,8 +143,9 @@ public class Master implements Runnable {
 		}
 		
 		namespace.remove(dirIndex);
-
+		saveState();
 		namespaceLock.unlock();
+		
 
 		return ClientFS.FSReturnVals.Success;
 	}
@@ -182,6 +203,8 @@ public class Master implements Runnable {
 
 		// Must sort at the end to maintain canonical order? -- shouldn't be necessary
 		// as they will all still be clustered
+		
+		saveState();
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -268,6 +291,7 @@ public class Master implements Runnable {
 		chunkLists.put(fullPath, new ArrayList<String>());
 		remainingChunkSpace.put(fullPath, 0); // Because no chunk allocated yet.
 		// Files are handled the same as directories. All directories end with a /
+		saveState();
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -300,6 +324,8 @@ public class Master implements Runnable {
 		}
 		chunkLists.remove(fullPath);
 		remainingChunkSpace.remove(fullPath);
+		
+		saveState();
 		
 		// Tell chunkservers to delete those files?
 		
@@ -336,7 +362,9 @@ public class Master implements Runnable {
 	}
 
 	
-	boolean VerifyFileHandle(String fileHandle)
+
+	
+	public boolean VerifyFileHandle(String fileHandle)
 	{
 		return !chunkLists.containsKey(fileHandle);
 	}
@@ -377,6 +405,7 @@ public class Master implements Runnable {
 		{
 			ArrayList<String> list = chunkLists.get(FileHandle);
 			remainingChunkSpace.put(FileHandle, remainingSpace - payloadSize);
+			saveState();
 			return list.get(list.size() - 1);
 		}
 		else
@@ -725,6 +754,39 @@ public class Master implements Runnable {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	private void saveState()
+	{
+		FileOutputStream fos;
+		ObjectOutputStream oos;
+		try {
+			fos = new FileOutputStream("state.txt");
+			oos = new ObjectOutputStream(fos);
+			oos.writeObject(namespace);
+			oos.writeObject(chunkLists);
+			oos.writeObject(chunkLocations);
+			oos.writeObject(remainingChunkSpace);
+			oos.writeObject(chunkservers);
+			oos.writeObject(chunkserverQueue);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void loadState() throws IOException, ClassNotFoundException
+	{
+		FileInputStream fis;
+		ObjectInputStream ois;
+		fis = new FileInputStream("state.txt");
+		ois = new ObjectInputStream(fis);
+		namespace = (ArrayList<String>) ois.readObject();
+		chunkLists = (HashMap<String, ArrayList<String>>) ois.readObject();
+		chunkLocations = (HashMap<String, String>) ois.readObject();
+		remainingChunkSpace = (HashMap<String, Integer>) ois.readObject();
+		chunkservers = (HashMap<String, Socket>) ois.readObject();
+		chunkserverQueue = (ArrayDeque<String>) ois.readObject();
 	}
 
 	public static void main(String[] args) {
