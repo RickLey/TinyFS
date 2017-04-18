@@ -39,6 +39,7 @@ public class Master implements Serializable, Runnable{
 	public static final int CLOSE_FILE_CMD = 108;
 	public static final int REGISTER_CHUNKSERVER_CMD = 109;
 	public static final int VERIFY_FILE_HANDLE_CMD = 110;
+	public static final int GET_HANDLE_FOR_APPEND_CMD = 111;
 
 	public static final String stateFile = "state";
 	
@@ -721,6 +722,33 @@ public class Master implements Serializable, Runnable{
 		out.writeBoolean(success);
 	}
 
+	/*	GET_HANDLE_FOR_APPEND_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	payload size
+	 * 	12-15	filehandle size
+	 * 	...		filehandle
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		chunkhandle size
+	 * 	...		chunkhandle
+	 *
+	 */
+	public void handleGetHandleForAppendCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int payloadSize = in.readInt();
+
+		int filehandleSize = in.readInt();
+		String filehandle = readString(in, filehandleSize);
+
+		byte[] chunkHandleBytes = GetHandleForAppend(filehandle, payloadSize).getBytes();
+
+
+		out.writeInt(8 + chunkHandleBytes.length);
+		out.writeInt(chunkHandleBytes.length);
+		out.write(chunkHandleBytes);
+	}
+
 	@Override
 	public void run() {
 		try {
@@ -774,6 +802,10 @@ public class Master implements Serializable, Runnable{
 
 					case VERIFY_FILE_HANDLE_CMD:
 						handleVerifyFileHandleCmd(in, out);
+						break;
+
+					case GET_HANDLE_FOR_APPEND_CMD:
+						handleGetHandleForAppendCmd(in, out);
 						break;
 				}
 
