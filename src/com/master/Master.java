@@ -1,6 +1,18 @@
 package com.master;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayDeque;
@@ -12,8 +24,7 @@ import com.chunkserver.ChunkServer;
 import com.client.FileHandle;
 import com.client.ClientFS;
 import com.client.ClientFS.FSReturnVals;
-
-public class Master implements Runnable {
+public class Master implements Serializable, Runnable{
 
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
@@ -27,6 +38,14 @@ public class Master implements Runnable {
 	public static final int OPEN_FILE_CMD = 107;
 	public static final int CLOSE_FILE_CMD = 108;
 	public static final int REGISTER_CHUNKSERVER_CMD = 109;
+	public static final int VERIFY_FILE_HANDLE_CMD = 110;
+	public static final int GET_HANDLE_FOR_APPEND_CMD = 111;
+	public static final int GET_FIRST_CHUNK_HANDLE_FOR_FILE_CMD = 112;
+	public static final int GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD = 113;
+	public static final int GET_NEXT_CHUNK_HANDLE_CMD = 114;
+	public static final int GET_PREVIOUS_CHUNK_HANDLE_CMD = 115;
+
+	public static final String stateFile = "state";
 	
 	private static ArrayList<String> namespace; //Ordered list of FileHandles(String)
 	private static HashMap<String, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
@@ -42,21 +61,28 @@ public class Master implements Runnable {
 	
 	public ChunkServer chunkserver;
 	
+	private void initializeDataStructures()
+	{
+		namespace = new ArrayList<String>();
+		chunkLists = new HashMap<String, ArrayList<String>>();
+		chunkLocations = new HashMap<String, String>();
+		remainingChunkSpace = new HashMap<String, Integer>();
+		namespace.add("/");
+		chunkservers = new HashMap<String, Socket>();
+		chunkserverQueue = new ArrayDeque<String>();
+	}
 	public Master(Socket socket)
 	{
-		if (namespace == null) {
-			namespace = new ArrayList<String>();
-			chunkLists = new HashMap<String, ArrayList<String>>();
-			chunkLocations = new HashMap<String, String>();
-			remainingChunkSpace = new HashMap<String, Integer>();
-			namespace.add("/");
-
+		if(namespace == null)
+		{
 			namespaceLock = new ReentrantLock();
-
-			chunkservers = new HashMap<String, Socket>();
-			chunkserverQueue = new ArrayDeque<String>();
+			try {
+				loadState();
+			} catch (ClassNotFoundException | IOException e) {
+				initializeDataStructures();
+			}
 		}
-
+		
 		connection = socket;
 	}
 	
@@ -90,6 +116,8 @@ public class Master implements Runnable {
 		}
 		namespace.add(index, fullPath);
 		// No chunkLists entry because directories do not consist of chunks
+		
+		saveState();
 
 		namespaceLock.unlock();
 
@@ -125,8 +153,9 @@ public class Master implements Runnable {
 		}
 		
 		namespace.remove(dirIndex);
-
+		saveState();
 		namespaceLock.unlock();
+		
 
 		return ClientFS.FSReturnVals.Success;
 	}
@@ -184,6 +213,8 @@ public class Master implements Runnable {
 
 		// Must sort at the end to maintain canonical order? -- shouldn't be necessary
 		// as they will all still be clustered
+		
+		saveState();
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -270,6 +301,7 @@ public class Master implements Runnable {
 		chunkLists.put(fullPath, new ArrayList<String>());
 		remainingChunkSpace.put(fullPath, 0); // Because no chunk allocated yet.
 		// Files are handled the same as directories. All directories end with a /
+		saveState();
 		return ClientFS.FSReturnVals.Success;
 	}
 
@@ -302,6 +334,8 @@ public class Master implements Runnable {
 		}
 		chunkLists.remove(fullPath);
 		remainingChunkSpace.remove(fullPath);
+		
+		saveState();
 		
 		// Tell chunkservers to delete those files?
 		
@@ -379,6 +413,7 @@ public class Master implements Runnable {
 		{
 			ArrayList<String> list = chunkLists.get(FileHandle);
 			remainingChunkSpace.put(FileHandle, remainingSpace - payloadSize);
+			saveState();
 			return list.get(list.size() - 1);
 		}
 		else
@@ -430,7 +465,8 @@ public class Master implements Runnable {
 		return new String(bytes);
 	}
 
-	/*	CREATE_DIR_CMD Packet Layout
+	/**
+	 *  CREATE_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -456,7 +492,8 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	DELETE_DIR_CMD Packet Layout
+	/**
+	 *  DELETE_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -482,7 +519,8 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	RENAME_DIR_CMD Packet Layout
+	/**
+	 *  RENAME_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -508,7 +546,8 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	LIST_DIR_CMD Packet Layout
+	/**
+	 *  LIST_DIR_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -549,7 +588,8 @@ public class Master implements Runnable {
 		}
 	}
 
-	/*	CREATE_FILE_CMD Packet Layout
+	/**
+	 *  CREATE_FILE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -575,7 +615,8 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	DELETE_FILE_CMD Packet Layout
+	/**
+	 *  DELETE_FILE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -601,7 +642,8 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	OPEN_FILE_CMD Packet Layout
+	/**
+	 *  OPEN_FILE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -634,7 +676,8 @@ public class Master implements Runnable {
 		}
 	}
 
-	/*	CLOSE_FILE_CMD Packet Layout
+	/**
+	 *  CLOSE_FILE_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -658,7 +701,8 @@ public class Master implements Runnable {
 		out.writeInt(returnVal.getValue());
 	}
 
-	/*	REGISTER_CHUNKSERVER_CMD Packet Layout
+	/**
+	 *  REGISTER_CHUNKSERVER_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -673,6 +717,186 @@ public class Master implements Runnable {
 		String host = readString(in, hostSize);
 		chunkservers.put(host, socket);
 		chunkserverQueue.addLast(host);
+	}
+
+	/**
+	 *  VERIFY_FILE_HANDLE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filehandle size
+	 * 	...		filehandle
+	 *
+	 * 	0-3		packet size
+	 * 	4		boolean
+	 *
+	 */
+	public void handleVerifyFileHandleCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filehandleSize = in.readInt();
+		String filehandle = readString(in, filehandleSize);
+
+		boolean success = VerifyFileHandle(filehandle);
+
+		out.writeInt(5);
+		out.writeBoolean(success);
+	}
+
+	/**
+	 *  GET_HANDLE_FOR_APPEND_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	payload size
+	 * 	12-15	filehandle size
+	 * 	...		filehandle
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		chunkhandle size
+	 * 	...		chunkhandle
+	 *
+	 */
+	public void handleGetHandleForAppendCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int payloadSize = in.readInt();
+
+		int filehandleSize = in.readInt();
+		String filehandle = readString(in, filehandleSize);
+
+		String chunkHandle = GetHandleForAppend(filehandle, (short) payloadSize);
+		if (chunkHandle == null) {
+			out.writeInt(4);
+			return;
+		}
+
+		byte[] chunkHandleBytes = chunkHandle.getBytes();
+		out.writeInt(8 + chunkHandleBytes.length);
+		out.writeInt(chunkHandleBytes.length);
+		out.write(chunkHandleBytes);
+	}
+
+	/**
+	 *  GET_FIRST_CHUNK_HANDLE_FOR_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filehandle size
+	 * 	...		filehandle
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		chunkhandle size
+	 * 	...		chunkhandle
+	 *
+	 */
+	public void handleGetFirstChunkHandleForFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filehandleSize = in.readInt();
+		String filehandle = readString(in, filehandleSize);
+
+		String chunkHandle = GetFirstChunkHandleForFile(filehandle);
+		if (chunkHandle == null) {
+			out.writeInt(4);
+			return;
+		}
+
+		byte[] chunkHandleBytes = chunkHandle.getBytes();
+		out.writeInt(8 + chunkHandleBytes.length);
+		out.writeInt(chunkHandleBytes.length);
+		out.write(chunkHandleBytes);
+	}
+
+	/**
+	 *  GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filehandle size
+	 * 	...		filehandle
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		chunkhandle size
+	 * 	...		chunkhandle
+	 *
+	 */
+	public void handleGetLastChunkHandleForFileCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filehandleSize = in.readInt();
+		String filehandle = readString(in, filehandleSize);
+
+		String chunkHandle = GetLastChunkHandleOfAFile(filehandle);
+		if (chunkHandle == null) {
+			out.writeInt(4);
+			return;
+		}
+
+		byte[] chunkHandleBytes = chunkHandle.getBytes();
+		out.writeInt(8 + chunkHandleBytes.length);
+		out.writeInt(chunkHandleBytes.length);
+		out.write(chunkHandleBytes);
+	}
+
+	/**
+	 *  GET_NEXT_CHUNK_HANDLE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filehandle size
+	 * 	12-15	chunkhandle size
+	 * 	...		filehandle
+	 * 	...		chunkhandle size
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		chunkhandle size
+	 * 	...		chunkhandle
+	 *
+	 */
+	public void handleGetNextChunkHandleCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filehandleSize = in.readInt();
+		int chunkhandleSize = in.readInt();
+
+		String filehandle = readString(in, filehandleSize);
+		String chunkhandle = readString(in, chunkhandleSize);
+
+		String nextChunkHandle = GetNextChunkHandle(filehandle, chunkhandle);
+		if (nextChunkHandle == null) {
+			out.writeInt(4);
+			return;
+		}
+
+		byte[] chunkHandleBytes = nextChunkHandle.getBytes();
+		out.writeInt(8 + chunkHandleBytes.length);
+		out.writeInt(chunkHandleBytes.length);
+		out.write(chunkHandleBytes);
+	}
+
+	/**
+	 *  GET_PREVIOUS_CHUNK_HANDLE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filehandle size
+	 * 	12-15	chunkhandle size
+	 * 	...		filehandle
+	 * 	...		chunkhandle size
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		chunkhandle size
+	 * 	...		chunkhandle
+	 *
+	 */
+	public void handleGetPreviousChunkHandleCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filehandleSize = in.readInt();
+		int chunkhandleSize = in.readInt();
+
+		String filehandle = readString(in, filehandleSize);
+		String chunkhandle = readString(in, chunkhandleSize);
+
+		String prevChunkHandle = GetPreviousChunkHandle(filehandle, chunkhandle);
+		if (prevChunkHandle == null) {
+			out.writeInt(4);
+			return;
+		}
+
+		byte[] chunkHandleBytes = prevChunkHandle.getBytes();
+		out.writeInt(8 + chunkHandleBytes.length);
+		out.writeInt(chunkHandleBytes.length);
+		out.write(chunkHandleBytes);
 	}
 
 	@Override
@@ -725,6 +949,30 @@ public class Master implements Runnable {
 					case REGISTER_CHUNKSERVER_CMD:
 						handleRegisterChunkserverCmd(in, connection);
 						break;
+
+					case VERIFY_FILE_HANDLE_CMD:
+						handleVerifyFileHandleCmd(in, out);
+						break;
+
+					case GET_HANDLE_FOR_APPEND_CMD:
+						handleGetHandleForAppendCmd(in, out);
+						break;
+
+					case GET_FIRST_CHUNK_HANDLE_FOR_FILE_CMD:
+						handleGetFirstChunkHandleForFileCmd(in, out);
+						break;
+
+					case GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD:
+						handleGetLastChunkHandleForFileCmd(in, out);
+						break;
+
+					case GET_NEXT_CHUNK_HANDLE_CMD:
+						handleGetNextChunkHandleCmd(in, out);
+						break;
+
+					case GET_PREVIOUS_CHUNK_HANDLE_CMD:
+						handleGetPreviousChunkHandleCmd(in, out);
+						break;
 				}
 
 				out.flush();
@@ -732,6 +980,39 @@ public class Master implements Runnable {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	private void saveState()
+	{
+		FileOutputStream fos;
+		ObjectOutputStream oos;
+		try {
+			fos = new FileOutputStream(stateFile);
+			oos = new ObjectOutputStream(fos);
+			oos.writeObject(namespace);
+			oos.writeObject(chunkLists);
+			oos.writeObject(chunkLocations);
+			oos.writeObject(remainingChunkSpace);
+			oos.writeObject(chunkservers);
+			oos.writeObject(chunkserverQueue);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	private void loadState() throws IOException, ClassNotFoundException
+	{
+		FileInputStream fis;
+		ObjectInputStream ois;
+		fis = new FileInputStream(stateFile);
+		ois = new ObjectInputStream(fis);
+		namespace = (ArrayList<String>) ois.readObject();
+		chunkLists = (HashMap<String, ArrayList<String>>) ois.readObject();
+		chunkLocations = (HashMap<String, String>) ois.readObject();
+		remainingChunkSpace = (HashMap<String, Integer>) ois.readObject();
+		chunkservers = (HashMap<String, Socket>) ois.readObject();
+		chunkserverQueue = (ArrayDeque<String>) ois.readObject();
 	}
 
 	public static void main(String[] args) {
