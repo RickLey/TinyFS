@@ -10,8 +10,10 @@ public class ClientRec {
 
 	//Create a master instance!
 	//Passing (1, "") in arguments for part one ONLY. that will change with networking.
-	Master master = new Master(1, "");
-	
+	Master master = new Master(null);
+
+	ChunkServer chunkServer = new ChunkServer();
+
 	/**
 	 * Appends a record to the open file as specified by ofh Returns BadHandle
 	 * if ofh is invalid Returns BadRecID if the specified RID is not null
@@ -42,15 +44,15 @@ public class ClientRec {
 		int offset = master.getEndOffset(ofh.filename);
 		
 		// Write the length of the record (2 bytes) right before the record itself	
-		if(!master.chunkserver.writeChunk(chunkHandle, ByteBuffer.allocate(2).putShort(length).array(), offset)){
+		if(!chunkServer.writeChunk(chunkHandle, ByteBuffer.allocate(2).putShort(length).array(), offset)){
 			return ClientFS.FSReturnVals.Fail;
 		}
 		// Write dirty byte
-		if(!master.chunkserver.writeChunk(chunkHandle, ByteBuffer.allocate(1).putShort((short)1).array(), offset+2)){
+		if(!chunkServer.writeChunk(chunkHandle, ByteBuffer.allocate(1).putShort((short)1).array(), offset+2)){
 			return ClientFS.FSReturnVals.Fail;
 		}
 		// Write data
-		if(!master.chunkserver.writeChunk(chunkHandle, payload, offset+3)){
+		if(!chunkServer.writeChunk(chunkHandle, payload, offset+3)){
 			return ClientFS.FSReturnVals.Fail;
 		}
 		
@@ -98,7 +100,7 @@ public class ClientRec {
 		int offset = 0;
 		while(true){
 			//Read the first 2 bytes to determine how long the record is and update offset
-			byte[] length = master.chunkserver.readChunk(chunkHandle, offset, 2);
+			byte[] length = chunkServer.readChunk(chunkHandle, offset, 2);
 			offset += 2;
 			
 			if(length == null){
@@ -106,7 +108,7 @@ public class ClientRec {
 			}
 			
 			// Read 1 byte at offset 2 to get dirty byte and update offset
-			byte[] dirty = master.chunkserver.readChunk(chunkHandle, offset, 1);
+			byte[] dirty = chunkServer.readChunk(chunkHandle, offset, 1);
 			offset += 1;
 			
 			
@@ -123,7 +125,7 @@ public class ClientRec {
 		}
 		
 		// Exit while loop, thus we read chunk at offset for len number of bytes
-		byte[] payload = master.chunkserver.readChunk(chunkHandle, offset, len);
+		byte[] payload = chunkServer.readChunk(chunkHandle, offset, len);
 		
 		//Populate rec
 		rec.setPayload(payload);
@@ -159,7 +161,7 @@ public class ClientRec {
 			//Read 2 bytes at offsetToRead to determine how long the record is. 
 			//Read after the length of the data to access next metadata.
 			//Always read 2 bytes because that is the length 
-			byte[] length = master.chunkserver.readChunk(chunkHandle, offsetToRead, 2);
+			byte[] length = chunkServer.readChunk(chunkHandle, offsetToRead, 2);
 			
 			if(length == null){
 				//read fails so we are at last record
@@ -167,7 +169,7 @@ public class ClientRec {
 			}
 			
 			// Read dirty
-			byte[] dirty = master.chunkserver.readChunk(chunkHandle, offsetToRead+2, 1);
+			byte[] dirty = chunkServer.readChunk(chunkHandle, offsetToRead+2, 1);
 			
 			short dirtybyte = ByteBuffer.wrap(dirty).getShort();
 			
@@ -192,7 +194,7 @@ public class ClientRec {
 		//out of while loop means read fail, thus currentOffset has the last valid record
 		//read at current offset witht he length provided by that offset
 		//+1 because of the dirty byte
-		byte[] payload = master.chunkserver.readChunk(chunkHandle, currentOffset, currentLength);
+		byte[] payload = chunkServer.readChunk(chunkHandle, currentOffset, currentLength);
 		
 		//Populate rec
 		rec.setPayload(payload);
@@ -226,7 +228,7 @@ public class ClientRec {
 		int offset = pivot.chunkOffset;
 		
 		//get length of the current to up
-		byte[] length = master.chunkserver.readChunk(chunkHandle, offset, 2);
+		byte[] length = chunkServer.readChunk(chunkHandle, offset, 2);
 		int len = ByteBuffer.wrap(length).getInt();
 		
 		// update offset with it
@@ -236,7 +238,7 @@ public class ClientRec {
 		//if not, we need to keep reading
 		while(true){
 			//get length of the current
-			length = master.chunkserver.readChunk(chunkHandle, offset, 2);
+			length = chunkServer.readChunk(chunkHandle, offset, 2);
 			
 			if(length == null){
 				//this record is the last record in the chunk, thus
@@ -245,11 +247,11 @@ public class ClientRec {
 				//reset offset
 				offset = 0;
 				//we read again
-				length = master.chunkserver.readChunk(chunkHandle, offset, 2);
+				length = chunkServer.readChunk(chunkHandle, offset, 2);
 			}
 			len = ByteBuffer.wrap(length).getInt();
 
-			byte[] dirty = master.chunkserver.readChunk(chunkHandle, offset+2, 1);
+			byte[] dirty = chunkServer.readChunk(chunkHandle, offset+2, 1);
 			
 			short dirtybyte = ByteBuffer.wrap(dirty).getShort();
 			
@@ -263,7 +265,7 @@ public class ClientRec {
 		}
 
 		//read len number of bytes at offset. Both len and offset are updated above
-		byte[] data = master.chunkserver.readChunk(chunkHandle, offset, len);
+		byte[] data = chunkServer.readChunk(chunkHandle, offset, len);
 		
 		//populate rec
 		RID r = new RID();
@@ -313,7 +315,7 @@ public class ClientRec {
 			//Read 2 bytes at offsetToRead to determine how long the record is. 
 			//Read after the length of the data to access next metadata.
 			//Always read 2 bytes because that is the length 
-			byte[] length = master.chunkserver.readChunk(chunkHandle, offsetToRead, 2);
+			byte[] length = chunkServer.readChunk(chunkHandle, offsetToRead, 2);
 			
 			if(length == null){
 				//read fails so we are at the beginning of the file
@@ -323,7 +325,7 @@ public class ClientRec {
 			}
 			
 			// Read dirty
-			byte[] dirty = master.chunkserver.readChunk(chunkHandle, offsetToRead+2, 1);
+			byte[] dirty = chunkServer.readChunk(chunkHandle, offsetToRead+2, 1);
 			
 			short dirtybyte = ByteBuffer.wrap(dirty).getShort();
 			

@@ -39,7 +39,7 @@ public class Master implements Runnable {
 	private static ArrayDeque<String> chunkserverQueue;
 
 	private Socket connection;
-	
+
 	public Master(Socket socket)
 	{
 		if (namespace == null) {
