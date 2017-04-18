@@ -38,6 +38,7 @@ public class Master implements Serializable, Runnable{
 	public static final int OPEN_FILE_CMD = 107;
 	public static final int CLOSE_FILE_CMD = 108;
 	public static final int REGISTER_CHUNKSERVER_CMD = 109;
+	public static final String stateFile = "state";
 	
 	private static ArrayList<String> namespace; //Ordered list of FileHandles(String)
 	private static HashMap<String, ArrayList<String>> chunkLists;	//Map from FileHandle to list of chunkHandle's
@@ -761,7 +762,7 @@ public class Master implements Serializable, Runnable{
 		FileOutputStream fos;
 		ObjectOutputStream oos;
 		try {
-			fos = new FileOutputStream("state.txt");
+			fos = new FileOutputStream(stateFile);
 			oos = new ObjectOutputStream(fos);
 			oos.writeObject(namespace);
 			oos.writeObject(chunkLists);
@@ -779,7 +780,7 @@ public class Master implements Serializable, Runnable{
 	{
 		FileInputStream fis;
 		ObjectInputStream ois;
-		fis = new FileInputStream("state.txt");
+		fis = new FileInputStream(stateFile);
 		ois = new ObjectInputStream(fis);
 		namespace = (ArrayList<String>) ois.readObject();
 		chunkLists = (HashMap<String, ArrayList<String>>) ois.readObject();
