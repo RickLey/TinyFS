@@ -23,7 +23,7 @@ public class ClientRec {
 
 	//Create a master instance!
 	//Passing (1, "") in arguments for part one ONLY. that will change with networking.
-	Master master = new Master(new Socket());
+	//Master master = new Master(new Socket());
 	private int csport = 0;
 	private String cshostname = "";
 	
@@ -35,10 +35,8 @@ public class ClientRec {
 			mIn = new DataInputStream(mSocket.getInputStream());
 
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
 	}
 	
 	/**
@@ -74,9 +72,10 @@ public class ClientRec {
 		//Get chunk handle and offset from master
 		//String chunkHandle = master.GetHandleForAppend(ofh.filename, length);
 		String chunkHandle = "";
+		int offset = 0;
 		try {
 			//Write packet size
-			//mOut.WriteInt(4); //????
+			mOut.writeInt(4); //????
 			//Write command
 			mOut.writeInt(Master.GET_HANDLE_FOR_APPEND_CMD);
 			mOut.writeInt(payload.length);
@@ -86,12 +85,20 @@ public class ClientRec {
 			int packetSize = mIn.readInt();
 			int size = mIn.readInt();
 			chunkHandle = readString(size);
+			
+			//Write packet size
+			mOut.writeInt(4);
+			mOut.writeInt(ofh.filename.length());
+			mOut.writeBytes(ofh.filename);
+			
+			packetSize = mIn.readInt();
+			offset = mIn.readInt();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		//int offset = master.getEndOffset(ofh.filename);
 		
-		//TODO: NEED COMMAND FOR THIS
-		int offset = master.getEndOffset(ofh.filename);
+		ConnectToChunkServer(chunkHandle);
 		
 		/*
 		if(!master.chunkserver.writeChunk(chunkHandle, ByteBuffer.allocate(2).putShort(length).array(), offset)){
@@ -128,7 +135,6 @@ public class ClientRec {
 		RecordID = new RID();
 		RecordID.chunkHandle = chunkHandle;
 		RecordID.chunkOffset = offset;
-		
 		
 		return ClientFS.FSReturnVals.Success;
 	}
@@ -201,7 +207,7 @@ public class ClientRec {
 		String chunkHandle = "";
 		try {
 			//Write packet size
-			//mOut.WriteInt(4); //????
+			mOut.writeInt(4); //????
 			//Write command
 			mOut.writeInt(Master.GET_FIRST_CHUNK_HANDLE_FOR_FILE_CMD);
 			mOut.writeInt(ofh.filename.length());
@@ -218,8 +224,7 @@ public class ClientRec {
 		*/
 		
 		ConnectToChunkServer(chunkHandle);
-		
-		short dirtybyte = 1;
+
 		int len = 0;
 		int offset = 0;
 		while(true){
@@ -239,10 +244,10 @@ public class ClientRec {
 			offset += 1;
 			
 			
-			dirtybyte = ByteBuffer.wrap(valid).getShort();
+			int validbyte = ByteBuffer.wrap(valid).getShort();
 			len = ByteBuffer.wrap(length).getInt();
 
-			if(dirtybyte == 0){
+			if(validbyte == 0){
 				//If dirtybyte is invalid, update offset for next read
 				offset += len;
 			} else {
@@ -287,7 +292,7 @@ public class ClientRec {
 		String chunkHandle = "";
 		try {
 			//Write packet size
-			//mOut.WriteInt(4); //????
+			mOut.writeInt(4); //????
 			//Write command
 			mOut.writeInt(Master.GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD);
 			mOut.writeInt(ofh.filename.length());
@@ -414,7 +419,7 @@ public class ClientRec {
 				//chunkHandle = master.GetNextChunkHandle(ofh.filename, pivot.chunkHandle);
 				try {
 					//Write packet size
-					//mOut.WriteInt(4); //????
+					mOut.writeInt(4); //????
 					//Write command
 					mOut.writeInt(Master.GET_NEXT_CHUNK_HANDLE_CMD);
 					mOut.write(ofh.filename.length());
@@ -428,7 +433,6 @@ public class ClientRec {
 					chunkHandle = readString(size);
 					
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}	
 				
@@ -500,7 +504,7 @@ public class ClientRec {
 			
 			try {
 				//Write packet size
-				//mOut.WriteInt(4); //????
+				mOut.writeInt(4); //????
 				//Write command
 				mOut.writeInt(Master.GET_PREVIOUS_CHUNK_HANDLE_CMD);
 				mOut.write(ofh.filename.length());
@@ -514,7 +518,6 @@ public class ClientRec {
 				chunkHandle = readString(size);
 				
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}	
 			
@@ -526,8 +529,6 @@ public class ClientRec {
 			
 			return ClientFS.FSReturnVals.Success;
 		}
-		
-		
 		
 		//now we will read up to the given offset by keeping track of the previous
 		int offsetToRead = 0;
@@ -649,26 +650,26 @@ public class ClientRec {
 		return payload;
 	}
 
-	//TODO: REVIEW
+	/*
+	 *  Asks master for the host and port for the given chunk handle and keeps record of them.
+	 *  Then it attempts to connect to the chunk server using the client class.
+	 *  If this function is called after a connection was established before,
+	 *  it checks if the new host and port match the previous ones. If so, 
+	 *  it wont try to reconnect to the same server.
+	 */
 	void ConnectToChunkServer(String chunkHandle){
 		//Notify the server to get chunk server info
+		byte[] host = null;
+		Socket s = null;
 		try {
 			//Write packet size
-			//mOut.WriteInt(4); //????
+			mOut.writeInt(4); //????
 			//Write command
 			//mOut.writeInt(Master.);
 			mOut.writeInt(chunkHandle.length());
 			mOut.writeBytes(chunkHandle);
 			mOut.flush();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-
-		byte[] host = null;
-		Socket s = null;
-		try {
+			
 			int size = mIn.readInt();
 			int hostsize = mIn.readInt();
 			mIn.read(host, 0, hostsize);
@@ -683,9 +684,7 @@ public class ClientRec {
 			this.csport = port;
 			this.cshostname = hostname;
 			client = new Client(cshostname, csport);
-			
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -704,7 +703,7 @@ public class ClientRec {
 		boolean success = false;
 		try {
 			//Write packet size
-			//mOut.WriteInt(4); //????
+			mOut.writeInt(4); //????
 			//Write command
 			mOut.writeInt(Master.VERIFY_FILE_HANDLE_CMD);
 			mOut.writeInt(fileHandle.length());

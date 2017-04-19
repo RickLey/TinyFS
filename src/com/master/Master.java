@@ -44,6 +44,7 @@ public class Master implements Serializable, Runnable{
 	public static final int GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD = 113;
 	public static final int GET_NEXT_CHUNK_HANDLE_CMD = 114;
 	public static final int GET_PREVIOUS_CHUNK_HANDLE_CMD = 115;
+	public static final int GET_END_OFFSET_CMD = 116;
 
 	public static final String stateFile = "state";
 	
@@ -58,8 +59,6 @@ public class Master implements Serializable, Runnable{
 	private static ArrayDeque<String> chunkserverQueue;
 
 	private Socket connection;
-	
-	public ChunkServer chunkserver;
 	
 	private void initializeDataStructures()
 	{
@@ -899,6 +898,28 @@ public class Master implements Serializable, Runnable{
 		out.write(chunkHandleBytes);
 	}
 
+	/**
+	 *  GET_PREVIOUS_CHUNK_HANDLE_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	filehandle size
+	 * 	12-15	filehandle
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		offset
+	 *
+	 */
+	private void handleGetEndOffsetCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int filehandleSize = in.readInt();
+		String filehandle = readString(in, filehandleSize);
+
+		int offset = getEndOffset(filehandle);
+
+		out.writeInt(8);
+		out.writeInt(offset);
+	}
+	
 	@Override
 	public void run() {
 		try {
@@ -972,6 +993,10 @@ public class Master implements Serializable, Runnable{
 
 					case GET_PREVIOUS_CHUNK_HANDLE_CMD:
 						handleGetPreviousChunkHandleCmd(in, out);
+						break;
+					
+					case GET_END_OFFSET_CMD:
+						handleGetEndOffsetCmd(in, out);
 						break;
 				}
 
