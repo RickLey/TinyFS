@@ -44,8 +44,8 @@ public class Master implements Serializable, Runnable{
 	public static final int GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD = 113;
 	public static final int GET_NEXT_CHUNK_HANDLE_CMD = 114;
 	public static final int GET_PREVIOUS_CHUNK_HANDLE_CMD = 115;
-	public static final int GET_END_OFFSET_CMD = 116;
-
+	public static final int GET_LOCATION_FOR_CHUNK_CMD = 116;
+	public static final int GET_END_OFFSET_CMD = 117;
 	public static final String stateFile = "state";
 	
 	private static ArrayList<String> namespace; //Ordered list of FileHandles(String)
@@ -368,6 +368,18 @@ public class Master implements Serializable, Runnable{
 			return ClientFS.FSReturnVals.BadHandle;
 		}
 		return ClientFS.FSReturnVals.Success;
+	}
+
+	/**
+	 * Returns the chunkserver that contains the given chunk handle
+	 * formatted as "host:port". Returns null is handle is not found.
+	 */
+	public String GetLocationForChunk(String chunkHandle) {
+		String host = chunkLocations.get(chunkHandle);
+		if (host == null) {
+			return null;
+		}
+		return host;
 	}
 
 	
@@ -701,7 +713,47 @@ public class Master implements Serializable, Runnable{
 	}
 
 	/**
-	 *  REGISTER_CHUNKSERVER_CMD Packet Layout
+	 *	GET_LOCATION_FOR_CHUNK_CMD Packet Layout
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		command
+	 * 	8-11	handle size
+	 * 	...		handle
+	 *
+	 * 	0-3		packet size
+	 * 	4-7		location size
+	 * 	...		location
+	 * 	...		port
+	 *
+	 */
+	public void handleGetLocationForChunkCmd(DataInputStream in, DataOutputStream out) throws IOException {
+		int handleSize = in.readInt();
+		String handle = readString(in, handleSize);
+
+		String host = GetLocationForChunk(handle);
+
+		if (host == null) {
+			out.writeInt(4);
+			out.flush();
+			return;
+		}
+
+		Socket socket = chunkservers.get(host);
+		if (socket == null) {
+			out.writeInt(4);
+			out.flush();
+			return;
+		}
+
+		byte[] hostBytes = host.getBytes();
+		out.writeInt(12 + hostBytes.length);
+		out.writeInt(hostBytes.length);
+		out.write(hostBytes);
+		out.writeInt(socket.getPort());
+	}
+
+	/**
+	 *	REGISTER_CHUNKSERVER_CMD Packet Layout
 	 *
 	 * 	0-3		packet size
 	 * 	4-7		command
@@ -997,6 +1049,10 @@ public class Master implements Serializable, Runnable{
 					
 					case GET_END_OFFSET_CMD:
 						handleGetEndOffsetCmd(in, out);
+						break;
+
+					case GET_LOCATION_FOR_CHUNK_CMD:
+						handleGetLocationForChunkCmd(in, out);
 						break;
 				}
 
