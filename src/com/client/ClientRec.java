@@ -30,7 +30,7 @@ public class ClientRec {
 	public ClientRec(){
 		//change the host and port number for master
 		try {
-			mSocket = new Socket("127.0.0.1", 1234);
+			mSocket = new Socket(Master.HOST, Master.PORT);
 			mOut = new DataOutputStream(mSocket.getOutputStream());
 			mIn = new DataInputStream(mSocket.getInputStream());
 
@@ -48,18 +48,23 @@ public class ClientRec {
 	 * Example usage: AppendRecord(FH1, obama, RecID1)
 	 */	
 	public FSReturnVals AppendRecord(FileHandle ofh, byte[] payload, RID RecordID) {
-				
+			
+		/*
 		if(RecordID != null){
+			System.out.println("Bad rec id!!");
 			return ClientFS.FSReturnVals.BadRecID;
 		}
+		*/
 		
 		//Check length of the payload with the chunk size
 		short length = (short) payload.length;
 		if(length+3 > ChunkServer.ChunkSize){ //+3 because of metadata
+			System.out.println("Record too long");
 			return ClientFS.FSReturnVals.RecordTooLong;
 		}
 		
 		if(!verifyFileHandleWithMaster(ofh.filename)){
+			System.out.println("Bad handle!!");
 			return ClientFS.FSReturnVals.BadHandle;
 		}
 		/*
@@ -74,25 +79,33 @@ public class ClientRec {
 		String chunkHandle = "";
 		int offset = 0;
 		try {
+			//REQUEST HANDLE
 			//Write packet size
-			mOut.writeInt(4); //????
+			mOut.writeInt(8+ofh.filename.length()); 
 			//Write command
 			mOut.writeInt(Master.GET_HANDLE_FOR_APPEND_CMD);
+			mOut.flush();
 			mOut.writeInt(payload.length);
 			mOut.writeInt(ofh.filename.length());
 			mOut.writeBytes(ofh.filename);
+			mOut.flush();
 			
 			int packetSize = mIn.readInt();
 			int size = mIn.readInt();
 			chunkHandle = readString(size);
 			
+			//REQUEST OFFSET
 			//Write packet size
-			mOut.writeInt(4);
+			mOut.writeInt(8+ofh.filename.length());
+			//Write command
+			mOut.writeInt(Master.GET_END_OFFSET_CMD);
 			mOut.writeInt(ofh.filename.length());
 			mOut.writeBytes(ofh.filename);
+			mOut.flush();
 			
 			packetSize = mIn.readInt();
 			offset = mIn.readInt();
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -132,7 +145,7 @@ public class ClientRec {
 		}
 		
 		// Populate RID
-		RecordID = new RID();
+		//RecordID = new RID();
 		RecordID.chunkHandle = chunkHandle;
 		RecordID.chunkOffset = offset;
 		
@@ -207,12 +220,18 @@ public class ClientRec {
 		String chunkHandle = "";
 		try {
 			//Write packet size
-			mOut.writeInt(4); //????
+			mOut.writeInt(8+ofh.filename.length());
 			//Write command
 			mOut.writeInt(Master.GET_FIRST_CHUNK_HANDLE_FOR_FILE_CMD);
 			mOut.writeInt(ofh.filename.length());
 			mOut.writeBytes(ofh.filename);
-		
+			mOut.flush();
+			
+			int packetsize = mIn.readInt();
+			if(packetsize == 4){
+				return ClientFS.FSReturnVals.Fail;
+			}
+			
 			int size = mIn.readInt();
 			chunkHandle = readString(size);
 		} catch (IOException e) {
@@ -292,16 +311,20 @@ public class ClientRec {
 		String chunkHandle = "";
 		try {
 			//Write packet size
-			mOut.writeInt(4); //????
+			mOut.writeInt(8+ofh.filename.length());
 			//Write command
 			mOut.writeInt(Master.GET_LAST_CHUNK_HANDLE_FOR_FILE_CMD);
 			mOut.writeInt(ofh.filename.length());
 			mOut.writeBytes(ofh.filename);
-		
+			mOut.flush();
+			
+			int packetsize = mIn.readInt();
+			if(packetsize == 4){
+				return ClientFS.FSReturnVals.Fail;
+			}
 			int size = mIn.readInt();
 			chunkHandle = readString(size);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		//Get chunk handle from master
@@ -419,16 +442,20 @@ public class ClientRec {
 				//chunkHandle = master.GetNextChunkHandle(ofh.filename, pivot.chunkHandle);
 				try {
 					//Write packet size
-					mOut.writeInt(4); //????
+					mOut.writeInt(12+ofh.filename.length()+chunkHandle.length()); 
 					//Write command
 					mOut.writeInt(Master.GET_NEXT_CHUNK_HANDLE_CMD);
-					mOut.write(ofh.filename.length());
+					mOut.writeInt(ofh.filename.length());
 					mOut.writeInt(chunkHandle.length());
 					
 					mOut.writeBytes(ofh.filename);
 					mOut.writeBytes(chunkHandle);
+					mOut.flush();
 					
-					int packetSize = mIn.readInt();
+					int packetsize = mIn.readInt();
+					if(packetsize == 4){
+						return ClientFS.FSReturnVals.Fail;
+					}
 					int size = mIn.readInt();
 					chunkHandle = readString(size);
 					
@@ -504,16 +531,20 @@ public class ClientRec {
 			
 			try {
 				//Write packet size
-				mOut.writeInt(4); //????
+				mOut.writeInt(12+ofh.filename.length()+chunkHandle.length());
 				//Write command
 				mOut.writeInt(Master.GET_PREVIOUS_CHUNK_HANDLE_CMD);
-				mOut.write(ofh.filename.length());
+				mOut.writeInt(ofh.filename.length());
 				mOut.writeInt(chunkHandle.length());
 				
 				mOut.writeBytes(ofh.filename);
 				mOut.writeBytes(chunkHandle);
+				mOut.flush();
 				
-				int packetSize = mIn.readInt();
+				int packetsize = mIn.readInt();
+				if(packetsize == 4){
+					return ClientFS.FSReturnVals.Fail;
+				}
 				int size = mIn.readInt();
 				chunkHandle = readString(size);
 				
@@ -663,19 +694,22 @@ public class ClientRec {
 		Socket s = null;
 		try {
 			//Write packet size
-			mOut.writeInt(4); //????
+			mOut.writeInt(8+chunkHandle.length());
 			//Write command
-			//mOut.writeInt(Master.);
+			mOut.writeInt(Master.GET_LOCATION_FOR_CHUNK_CMD);
 			mOut.writeInt(chunkHandle.length());
 			mOut.writeBytes(chunkHandle);
 			mOut.flush();
 			
-			int size = mIn.readInt();
+			int packetsize = mIn.readInt();
+			if(packetsize == 4){
+				return;
+			}
 			int hostsize = mIn.readInt();
-			mIn.read(host, 0, hostsize);
+			String hostname = readString(hostsize);
+			System.out.println("HOST: " + hostname);
 			int port = mIn.readInt();
-			String hostname = new String(host);
-			
+			System.out.println("PORT: " + port);
 			if(csport == port && cshostname == hostname){
 				// already connected to this chunk server
 				return;
@@ -700,17 +734,20 @@ public class ClientRec {
 	
 	private boolean verifyFileHandleWithMaster(String fileHandle){
 		// Send file handle to master for verification
-		boolean success = false;
+		boolean success = true;
 		try {
 			//Write packet size
-			mOut.writeInt(4); //????
+			mOut.writeInt(8+fileHandle.length());
 			//Write command
 			mOut.writeInt(Master.VERIFY_FILE_HANDLE_CMD);
 			mOut.writeInt(fileHandle.length());
 			mOut.writeBytes(fileHandle);
+			mOut.flush();
 			
 			int size = mIn.readInt();
 			success = mIn.readBoolean();
+			
+			System.out.println("ClientRec: File handle " + fileHandle + " verified -> result: " + success);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

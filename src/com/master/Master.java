@@ -28,6 +28,9 @@ public class Master implements Serializable, Runnable{
 
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
+	
+	public int server_port = 0;
+	public String server_host = "";
 
 	public static final int CREATE_DIR_CMD = 101;
 	public static final int DELETE_DIR_CMD = 102;
@@ -56,6 +59,7 @@ public class Master implements Serializable, Runnable{
 	private static ReentrantLock namespaceLock;
 
 	private static HashMap<String, Socket> chunkservers;
+	private static HashMap<String, Integer> chunkServers;
 	private static ArrayDeque<String> chunkserverQueue;
 
 	private Socket connection;
@@ -69,6 +73,8 @@ public class Master implements Serializable, Runnable{
 		namespace.add("/");
 		chunkservers = new HashMap<String, Socket>();
 		chunkserverQueue = new ArrayDeque<String>();
+		
+		chunkServers = new HashMap<String, Integer>();
 	}
 	public Master(Socket socket)
 	{
@@ -385,7 +391,7 @@ public class Master implements Serializable, Runnable{
 	
 	public boolean VerifyFileHandle(String fileHandle)
 	{
-		return !chunkLists.containsKey(fileHandle);
+		return chunkLists.containsKey(fileHandle);
 	}
 	
 	public boolean VerifyFileHandleAndChunkHandle(String fileHandle, String chunkHandle){
@@ -431,9 +437,12 @@ public class Master implements Serializable, Runnable{
 		{
 			try {
 				String host = nextChunkserver();
-				Socket socket = chunkservers.get(host);
-				DataOutputStream out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
-				DataInputStream in = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+				//Socket socket = chunkservers.get(host);
+				
+				//Socket s = new Socket(server_host, server_port);
+				Socket s = new Socket("localhost", 8081);
+				DataOutputStream out = new DataOutputStream(s.getOutputStream());
+				DataInputStream in = new DataInputStream(s.getInputStream());
 
 				out.writeInt(8);
 				out.writeInt(ChunkServer.CreateChunkCMD);
@@ -731,7 +740,8 @@ public class Master implements Serializable, Runnable{
 		String handle = readString(in, handleSize);
 
 		String host = GetLocationForChunk(handle);
-
+		
+		System.out.println("HOST: " + host);
 		if (host == null) {
 			out.writeInt(4);
 			out.flush();
@@ -749,7 +759,12 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(12 + hostBytes.length);
 		out.writeInt(hostBytes.length);
 		out.write(hostBytes);
+		
+		System.out.println("PORT: " + socket.getPort());
+		
 		out.writeInt(socket.getPort());
+		
+		System.out.println("Server location sent");
 	}
 
 	/**
@@ -766,7 +781,16 @@ public class Master implements Serializable, Runnable{
 	public void handleRegisterChunkserverCmd(DataInputStream in, Socket socket) throws IOException {
 		int hostSize = in.readInt();
 		String host = readString(in, hostSize);
+		int port = in.readInt();
+		System.out.println("server host: " + host);
+		System.out.println("server port: " + port);
+		
 		chunkservers.put(host, socket);
+		chunkServers.put(host, port);
+		
+		server_host = host;
+		server_port = port;
+		
 		chunkserverQueue.addLast(host);
 	}
 
@@ -790,6 +814,8 @@ public class Master implements Serializable, Runnable{
 
 		out.writeInt(5);
 		out.writeBoolean(success);
+		
+		System.out.println("File handle verified -> result: " + success);
 	}
 
 	/**
@@ -822,6 +848,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(8 + chunkHandleBytes.length);
 		out.writeInt(chunkHandleBytes.length);
 		out.write(chunkHandleBytes);
+		
+		System.out.println("Handle for append sent");
 	}
 
 	/**
@@ -851,6 +879,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(8 + chunkHandleBytes.length);
 		out.writeInt(chunkHandleBytes.length);
 		out.write(chunkHandleBytes);
+		
+		System.out.println("First chunk handle for file sent");
 	}
 
 	/**
@@ -880,6 +910,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(8 + chunkHandleBytes.length);
 		out.writeInt(chunkHandleBytes.length);
 		out.write(chunkHandleBytes);
+		
+		System.out.println("Last chunk handle for file sent");
 	}
 
 	/**
@@ -914,6 +946,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(8 + chunkHandleBytes.length);
 		out.writeInt(chunkHandleBytes.length);
 		out.write(chunkHandleBytes);
+		
+		System.out.println("Next chunk handle for file sent");
 	}
 
 	/**
@@ -948,6 +982,8 @@ public class Master implements Serializable, Runnable{
 		out.writeInt(8 + chunkHandleBytes.length);
 		out.writeInt(chunkHandleBytes.length);
 		out.write(chunkHandleBytes);
+		
+		System.out.println("Previous chunk handle for file sent");
 	}
 
 	/**
@@ -968,8 +1004,10 @@ public class Master implements Serializable, Runnable{
 
 		int offset = getEndOffset(filehandle);
 
-		out.writeInt(8);
+		out.writeInt(4);
 		out.writeInt(offset);
+		
+		System.out.println("End offset for file sent");
 	}
 	
 	@Override
@@ -1108,6 +1146,7 @@ public class Master implements Serializable, Runnable{
 
 			while (true) {
 				connection = server.accept();
+				System.out.println("Connection accepted");
 				Master master = new Master(connection);
 				Thread thread = new Thread(master);
 				thread.start();

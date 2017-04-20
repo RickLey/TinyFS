@@ -22,7 +22,7 @@ public class UnitTest2 {
 	public static void test2(ClientFS cfs){
 		UnitTest1 ut1 = new UnitTest1();
 		ut1.test1(cfs);
-		int N = ut1.N;
+		int N = 100;
 		
 		System.out.println(TestName + "DeleteDir(\"/Shahram/N\"), ListDir(\"/Shahram\") and verify direcotry N is gone (success)");
 		String dir1 = "Shahram";

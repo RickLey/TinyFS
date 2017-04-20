@@ -37,6 +37,8 @@ public class ChunkServer implements ChunkServerInterface {
 	public static final int TRUE = 1;
 	public static final int FALSE = 0;
 	
+	public static int SERVER_PORT = 8081;
+	
 	/*
 	 * Available size for records is MAX_CHUNKSIZE - 3 because of metadata (2 bytes for length of record and 1 byte for (in)valid)
 	 */
@@ -63,21 +65,31 @@ public class ChunkServer implements ChunkServerInterface {
 			counter = cntrs[cntrs.length - 1];
 		}
 
+		/*
 		// register with master
+		Socket masterSocket = null;
 		try {
-			Socket masterSocket = new Socket(Master.HOST, Master.PORT);
+			masterSocket = new Socket(Master.HOST, Master.PORT);
 			DataOutputStream out = new DataOutputStream(new BufferedOutputStream(masterSocket.getOutputStream()));
-			byte[] host = InetAddress.getLocalHost().getHostAddress().getBytes();
-			out.writeInt(12 + host.length);
+			//byte[] host = InetAddress.getLocalHost().getHostAddress().getBytes();
+			String host = "localhost";
+			out.writeInt(12 + host.length());
 			out.writeInt(Master.REGISTER_CHUNKSERVER_CMD);
-			out.writeInt(host.length);
-			out.write(host);
+			out.writeInt(host.length());
+			out.writeBytes(host);
+			out.writeInt(SERVER_PORT);
 			out.flush();
 		} catch (IOException e) {
 			e.printStackTrace();
+		} finally {
+			try {
+				masterSocket.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
+		*/
 	}
-	
 	
 	/**
 	 * Each chunk is corresponding to a file.
@@ -140,10 +152,10 @@ public class ChunkServer implements ChunkServerInterface {
 		
 		try {
 			//Allocate a port and write it to the config file for the Client to consume
-			commChanel = new ServerSocket(ServerPort);
-			ServerPort=commChanel.getLocalPort();
+			commChanel = new ServerSocket(SERVER_PORT);
+			//SERVER_PORT = commChanel.getLocalPort();
 			PrintWriter outWrite=new PrintWriter(new FileOutputStream(ClientConfigFile));
-			outWrite.println("localhost:"+ServerPort);
+			outWrite.println("localhost:"+SERVER_PORT);
 			outWrite.close();
 		} catch (IOException ex) {
 			System.out.println("Error, failed to open a new socket to listen on.");
@@ -156,6 +168,7 @@ public class ChunkServer implements ChunkServerInterface {
 		while (!done){
 			try {
 				ClientConnection = commChanel.accept();
+				System.out.println("Connection accepted");
 				ReadInput = new ObjectInputStream(ClientConnection.getInputStream());
 				WriteOutput = new ObjectOutputStream(ClientConnection.getOutputStream());
 				
