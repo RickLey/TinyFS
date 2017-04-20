@@ -64,7 +64,6 @@ public class ChunkServer implements ChunkServerInterface {
 			Arrays.sort(cntrs);
 			counter = cntrs[cntrs.length - 1];
 		}
-
 		/*
 		// register with master
 		Socket masterSocket = null;
@@ -181,9 +180,9 @@ public class ChunkServer implements ChunkServerInterface {
 					switch (CMD){
 					case CreateChunkCMD:
 						String chunkhandle = cs.createChunk();
-						byte[] CHinbytes = chunkhandle.getBytes();
-						WriteOutput.writeInt(ChunkServer.PayloadSZ + CHinbytes.length);
-						WriteOutput.write(CHinbytes);
+						//byte[] CHinbytes = chunkhandle.getBytes();
+						//WriteOutput.writeInt(ChunkServer.PayloadSZ + chunkhandle.length());
+						WriteOutput.writeObject(chunkhandle);
 						WriteOutput.flush();
 						break;
 
@@ -231,11 +230,14 @@ public class ChunkServer implements ChunkServerInterface {
 					}
 				}
 			} catch (IOException ex){
+				System.out.println(ex.getStackTrace());
+				System.out.println(ex.getMessage());
 				System.out.println("Client Disconnected");
 			} finally {
 				try {
 					if (ClientConnection != null)
 						ClientConnection.close();
+						System.out.println("Connection closed after succesful request.");
 					if (ReadInput != null)
 						ReadInput.close();
 					if (WriteOutput != null) WriteOutput.close();

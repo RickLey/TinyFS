@@ -29,8 +29,8 @@ public class Master implements Serializable, Runnable{
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
 	
-	public int server_port = 0;
-	public String server_host = "";
+	public int server_port = 8081;
+	public String server_host = "localhost";
 
 	public static final int CREATE_DIR_CMD = 101;
 	public static final int DELETE_DIR_CMD = 102;
@@ -439,17 +439,17 @@ public class Master implements Serializable, Runnable{
 				String host = nextChunkserver();
 				//Socket socket = chunkservers.get(host);
 				
-				//Socket s = new Socket(server_host, server_port);
-				Socket s = new Socket("localhost", 8081);
-				DataOutputStream out = new DataOutputStream(s.getOutputStream());
-				DataInputStream in = new DataInputStream(s.getInputStream());
+				Socket s = new Socket(server_host, server_port);
+				//Socket s = new Socket("localhost", 8081);
+				ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+				ObjectInputStream in = new ObjectInputStream(s.getInputStream());
 
 				out.writeInt(8);
 				out.writeInt(ChunkServer.CreateChunkCMD);
 				out.flush();
 
-				int handleSize = in.readInt() - ChunkServer.PayloadSZ;
-				String chunkHandle = readString(in, handleSize);
+				//int handleSize = in.readInt() - ChunkServer.PayloadSZ;
+				String chunkHandle = (String) in.readObject();//readString(in, handleSize);
 				chunkLocations.put(chunkHandle, host);
 				chunkLists.get(FileHandle).add(chunkHandle); // add the handle to the list for this file
 				remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize); // reset the remaining space to be chunksize - payloadsize
@@ -457,8 +457,12 @@ public class Master implements Serializable, Runnable{
 			} catch (IOException e) {
 				e.printStackTrace();
 				return null;
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
+				return null;
 			}
 		}
+		
 	}
 	
 	public int getEndOffset(String fileHandle){
@@ -739,8 +743,8 @@ public class Master implements Serializable, Runnable{
 		int handleSize = in.readInt();
 		String handle = readString(in, handleSize);
 
-		String host = GetLocationForChunk(handle);
-		
+		//String host = GetLocationForChunk(handle);
+		/*
 		System.out.println("HOST: " + host);
 		if (host == null) {
 			out.writeInt(4);
@@ -754,15 +758,15 @@ public class Master implements Serializable, Runnable{
 			out.flush();
 			return;
 		}
-
-		byte[] hostBytes = host.getBytes();
-		out.writeInt(12 + hostBytes.length);
-		out.writeInt(hostBytes.length);
-		out.write(hostBytes);
+		 */
+		//byte[] hostBytes = host.getBytes();
+		out.writeInt(12 + server_host.length());
+		out.writeInt(server_host.length()); //TODO: Change to container
+		out.writeBytes(server_host); //TODO: Change to container
 		
-		System.out.println("PORT: " + socket.getPort());
+		//System.out.println("PORT: " + socket.getPort());
 		
-		out.writeInt(socket.getPort());
+		out.writeInt(server_port); //TODO: Change to container
 		
 		System.out.println("Server location sent");
 	}
