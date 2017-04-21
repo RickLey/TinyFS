@@ -5,6 +5,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 //import java.util.Arrays;
 
@@ -58,13 +59,16 @@ public class ChunkServer implements ChunkServerInterface {
 			counter = 0;
 		}else{
 			long[] cntrs = new long[fs.length];
-			for (int j=0; j < cntrs.length; j++)
+			for (int j=0; j < cntrs.length; j++){
+				if(fs[j].getName().equals(".DS_Store")){
+					continue;
+				}
 				cntrs[j] = Long.valueOf( fs[j].getName() ); 
-			
+			}
 			Arrays.sort(cntrs);
 			counter = cntrs[cntrs.length - 1];
 		}
-		/*
+
 		// register with master
 		Socket masterSocket = null;
 		try {
@@ -87,7 +91,6 @@ public class ChunkServer implements ChunkServerInterface {
 				e.printStackTrace();
 			}
 		}
-		*/
 	}
 	
 	/**
@@ -139,105 +142,91 @@ public class ChunkServer implements ChunkServerInterface {
 		}
 	}
 	
-	public static void ReadAndProcessRequests()
-	{
-		ChunkServer cs = new ChunkServer();
-		
-		//Used for communication with the Client via the network
-		int ServerPort = 0; //Set to 0 to cause ServerSocket to allocate the port 
-		ServerSocket commChanel = null;
-		ObjectOutputStream WriteOutput = null;
-		ObjectInputStream ReadInput = null;
-		
-		try {
-			//Allocate a port and write it to the config file for the Client to consume
-			commChanel = new ServerSocket(SERVER_PORT);
-			//SERVER_PORT = commChanel.getLocalPort();
-			PrintWriter outWrite=new PrintWriter(new FileOutputStream(ClientConfigFile));
-			outWrite.println("localhost:"+SERVER_PORT);
-			outWrite.close();
-		} catch (IOException ex) {
-			System.out.println("Error, failed to open a new socket to listen on.");
-			ex.printStackTrace();
-		}
-		
-		boolean done = false;
-		Socket ClientConnection = null;  //A client's connection to the server
+	private static class RequestProcessor implements Runnable {
+		private ChunkServer cs = null;
+		private Socket socket = null;
+		private ObjectOutputStream WriteOutput = null;
+		private ObjectInputStream ReadInput = null;
 
-		while (!done){
+		public RequestProcessor(ChunkServer cs, Socket socket) {
+			this.cs = cs;
+			this.socket = socket;
 			try {
-				ClientConnection = commChanel.accept();
-				System.out.println("Connection accepted");
-				ReadInput = new ObjectInputStream(ClientConnection.getInputStream());
-				WriteOutput = new ObjectOutputStream(ClientConnection.getOutputStream());
-				
+				this.ReadInput = new ObjectInputStream(socket.getInputStream());
+				this.WriteOutput = new ObjectOutputStream(socket.getOutputStream());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+		public void run() {
+			//Socket ClientConnection = null;  //A client's connection to the server
+
+			try {
 				//Use the existing input and output stream as long as the client is connected
-				while (!ClientConnection.isClosed()) {
+				while (!socket.isClosed()) {
 					int payloadsize =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
-					if (payloadsize == -1) 
+					if (payloadsize == -1)
 						break;
 					int CMD = Client.ReadIntFromInputStream("ChunkServer", ReadInput);
 					switch (CMD){
-					case CreateChunkCMD:
-						String chunkhandle = cs.createChunk();
-						//byte[] CHinbytes = chunkhandle.getBytes();
-						//WriteOutput.writeInt(ChunkServer.PayloadSZ + chunkhandle.length());
-						WriteOutput.writeObject(chunkhandle);
-						WriteOutput.flush();
-						break;
+						case CreateChunkCMD:
+							String chunkhandle = cs.createChunk();
+							//byte[] CHinbytes = chunkhandle.getBytes();
+							//WriteOutput.writeInt(ChunkServer.PayloadSZ + CHinbytes.length);
+							WriteOutput.writeObject(chunkhandle);
+							WriteOutput.flush();
+							break;
 
-					case ReadChunkCMD:
-						int offset =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
-						int payloadlength =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
-						int chunkhandlesize = payloadsize - ChunkServer.PayloadSZ - ChunkServer.CMDlength - (2 * 4);
-						if (chunkhandlesize < 0)
-							System.out.println("Error in ChunkServer.java, ReadChunkCMD has wrong size.");
-						byte[] CHinBytes = Client.RecvPayload("ChunkServer", ReadInput, chunkhandlesize);
-						String ChunkHandle = (new String(CHinBytes)).toString();
-						
-						byte[] res = cs.readChunk(ChunkHandle, offset, payloadlength);
-						
-						if (res == null)
-							WriteOutput.writeInt(ChunkServer.PayloadSZ);
-						else {
-							WriteOutput.writeInt(ChunkServer.PayloadSZ + res.length);
-							WriteOutput.write(res);
-						}
-						WriteOutput.flush();
-						break;
+						case ReadChunkCMD:
+							int offset =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
+							int payloadlength =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
+							int chunkhandlesize = payloadsize - ChunkServer.PayloadSZ - ChunkServer.CMDlength - (2 * 4);
+							if (chunkhandlesize < 0)
+								System.out.println("Error in ChunkServer.java, ReadChunkCMD has wrong size.");
+							byte[] CHinBytes = Client.RecvPayload("ChunkServer", ReadInput, chunkhandlesize);
+							String ChunkHandle = (new String(CHinBytes)).toString();
 
-					case WriteChunkCMD:
-						offset =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
-						payloadlength =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
-						byte[] payload = Client.RecvPayload("ChunkServer", ReadInput, payloadlength);
-						chunkhandlesize = payloadsize - ChunkServer.PayloadSZ - ChunkServer.CMDlength - (2 * 4) - payloadlength;
-						if (chunkhandlesize < 0)
-							System.out.println("Error in ChunkServer.java, WritehChunkCMD has wrong size.");
-						CHinBytes = Client.RecvPayload("ChunkServer", ReadInput, chunkhandlesize);
-						ChunkHandle = (new String(CHinBytes)).toString();
+							byte[] res = cs.readChunk(ChunkHandle, offset, payloadlength);
 
-						//Call the writeChunk command
-						if (cs.writeChunk(ChunkHandle, payload, offset))
-							WriteOutput.writeInt(ChunkServer.TRUE);
-						else WriteOutput.writeInt(ChunkServer.FALSE);
-						
-						WriteOutput.flush();
-						break;
+							if (res == null)
+								WriteOutput.writeInt(ChunkServer.PayloadSZ);
+							else {
+								WriteOutput.writeInt(ChunkServer.PayloadSZ + res.length);
+								WriteOutput.write(res);
+							}
+							WriteOutput.flush();
+							break;
 
-					default:
-						System.out.println("Error in ChunkServer, specified CMD "+CMD+" is not recognized.");
-						break;
+						case WriteChunkCMD:
+							offset =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
+							payloadlength =  Client.ReadIntFromInputStream("ChunkServer", ReadInput);
+							byte[] payload = Client.RecvPayload("ChunkServer", ReadInput, payloadlength);
+							chunkhandlesize = payloadsize - ChunkServer.PayloadSZ - ChunkServer.CMDlength - (2 * 4) - payloadlength;
+							if (chunkhandlesize < 0)
+								System.out.println("Error in ChunkServer.java, WritehChunkCMD has wrong size.");
+							CHinBytes = Client.RecvPayload("ChunkServer", ReadInput, chunkhandlesize);
+							ChunkHandle = (new String(CHinBytes)).toString();
+
+							//Call the writeChunk command
+							if (cs.writeChunk(ChunkHandle, payload, offset))
+								WriteOutput.writeInt(ChunkServer.TRUE);
+							else WriteOutput.writeInt(ChunkServer.FALSE);
+
+							WriteOutput.flush();
+							break;
+
+						default:
+							System.out.println("Error in ChunkServer, specified CMD "+CMD+" is not recognized.");
+							break;
 					}
 				}
 			} catch (IOException ex){
-				System.out.println(ex.getStackTrace());
-				System.out.println(ex.getMessage());
 				System.out.println("Client Disconnected");
 			} finally {
 				try {
-					if (ClientConnection != null)
-						ClientConnection.close();
-						System.out.println("Connection closed after succesful request.");
+					if (socket != null)
+						socket.close();
 					if (ReadInput != null)
 						ReadInput.close();
 					if (WriteOutput != null) WriteOutput.close();
@@ -251,6 +240,34 @@ public class ChunkServer implements ChunkServerInterface {
 
 	public static void main(String args[])
 	{
-		ReadAndProcessRequests();
+		ChunkServer cs = new ChunkServer();
+
+		int ServerPort = 0; //Set to 0 to cause ServerSocket to allocate the port
+		ServerSocket commChanel = null;
+
+		try {
+			//Allocate a port and write it to the config file for the Client to consume
+			commChanel = new ServerSocket(SERVER_PORT); //TODO:hardcoded so far!!!! must change
+			//ServerPort=commChanel.getLocalPort();
+			PrintWriter outWrite=new PrintWriter(new FileOutputStream(ClientConfigFile));
+			outWrite.println("localhost:"+ServerPort);
+			outWrite.close();
+		} catch (IOException ex) {
+			System.out.println("Error, failed to open a new socket to listen on.");
+			ex.printStackTrace();
+		}
+
+		Socket socket = null;
+		ArrayList<Thread> threads = new ArrayList<Thread>();
+		while (true) {
+			try {
+				socket = commChanel.accept();
+				Thread thread = new Thread(new ChunkServer.RequestProcessor(cs, socket));
+				thread.start();
+				threads.add(thread);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }

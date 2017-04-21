@@ -411,7 +411,7 @@ public class Master implements Serializable, Runnable{
 	public String GetPreviousChunkHandle(String fileHandle, String ChunkHandle){
 		ArrayList<String> list = chunkLists.get(fileHandle);
 		int index = list.indexOf(ChunkHandle) - 1;
-		return index > 0 ? list.get(index) : null;
+		return index >= 0 ? list.get(index) : null;
 	}
 	
 	public String GetLastChunkHandleOfAFile(String FileHandle){
@@ -424,25 +424,32 @@ public class Master implements Serializable, Runnable{
 		return list.size() > 0 ? list.get(0) : null;
 	}
 	
-	public String GetHandleForAppend(String FileHandle, short payloadSize){
+	public String GetHandleForAppend(String FileHandle, short payloadSize, int offset){
 		int remainingSpace = remainingChunkSpace.get(FileHandle);
+		System.out.println("Remaining space: " + remainingSpace);
+		System.out.println("Payload size: " + payloadSize);
 		if(payloadSize < remainingSpace)
 		{
+			offset = ChunkServer.ChunkSize - remainingSpace;
+			System.out.println("Offset in Master: GetHandleForAppend: " + offset + "  inside if");
 			ArrayList<String> list = chunkLists.get(FileHandle);
-			remainingChunkSpace.put(FileHandle, remainingSpace - payloadSize);
+			remainingChunkSpace.put(FileHandle, remainingSpace - payloadSize - 3); //-3 for metadata
 			saveState();
-			return list.get(list.size() - 1);
+			return list.get(list.size() - 1) + ":" + offset;
 		}
 		else
 		{
+			Socket s = null;
+			ObjectOutputStream out = null;
+			ObjectInputStream in = null;
 			try {
 				String host = nextChunkserver();
 				//Socket socket = chunkservers.get(host);
 				
-				Socket s = new Socket(server_host, server_port);
+				s = new Socket(server_host, server_port);
 				//Socket s = new Socket("localhost", 8081);
-				ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
-				ObjectInputStream in = new ObjectInputStream(s.getInputStream());
+				out = new ObjectOutputStream(s.getOutputStream());
+				in = new ObjectInputStream(s.getInputStream());
 
 				out.writeInt(8);
 				out.writeInt(ChunkServer.CreateChunkCMD);
@@ -452,21 +459,39 @@ public class Master implements Serializable, Runnable{
 				String chunkHandle = (String) in.readObject();//readString(in, handleSize);
 				chunkLocations.put(chunkHandle, host);
 				chunkLists.get(FileHandle).add(chunkHandle); // add the handle to the list for this file
-				remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize); // reset the remaining space to be chunksize - payloadsize
-				return chunkHandle;
+				offset = 0;
+				System.out.println("Offset in Master: GetHandleForAppend: " + offset + "  inside else");
+				remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize - 3); //-3 for metadata // reset the remaining space to be chunksize - payloadsize
+				return chunkHandle + ":" + offset;
 			} catch (IOException e) {
 				e.printStackTrace();
 				return null;
 			} catch (ClassNotFoundException e) {
 				e.printStackTrace();
 				return null;
+			} finally {
+				
+				try {
+					if(s != null){
+						s.close();
+					}
+					if(out != null){
+						out.close();
+					}
+					if(in != null){
+						in.close();
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+
 			}
 		}
 		
 	}
 	
 	public int getEndOffset(String fileHandle){
-		return remainingChunkSpace.get(fileHandle);
+		return ChunkServer.ChunkSize - remainingChunkSpace.get(fileHandle);
 	}
 	
 
@@ -841,17 +866,21 @@ public class Master implements Serializable, Runnable{
 
 		int filehandleSize = in.readInt();
 		String filehandle = readString(in, filehandleSize);
-
-		String chunkHandle = GetHandleForAppend(filehandle, (short) payloadSize);
-		if (chunkHandle == null) {
+		int offset = 0;
+		String chunkHandleANDoffset = GetHandleForAppend(filehandle, (short) payloadSize, offset);
+		if (chunkHandleANDoffset == null) {
 			out.writeInt(4);
 			return;
 		}
 
-		byte[] chunkHandleBytes = chunkHandle.getBytes();
-		out.writeInt(8 + chunkHandleBytes.length);
+		String[] split = chunkHandleANDoffset.split(":");
+		System.out.println("Offset in master before sending: " + offset);
+		byte[] chunkHandleBytes = split[0].getBytes();
+		out.writeInt(12 + chunkHandleBytes.length);
 		out.writeInt(chunkHandleBytes.length);
 		out.write(chunkHandleBytes);
+		
+		out.writeInt(Integer.parseInt(split[1]));
 		
 		System.out.println("Handle for append sent");
 	}
@@ -1107,25 +1136,27 @@ public class Master implements Serializable, Runnable{
 	
 	private void saveState()
 	{
-		FileOutputStream fos;
-		ObjectOutputStream oos;
-		try {
-			fos = new FileOutputStream(stateFile);
-			oos = new ObjectOutputStream(fos);
-			oos.writeObject(namespace);
-			oos.writeObject(chunkLists);
-			oos.writeObject(chunkLocations);
-			oos.writeObject(remainingChunkSpace);
-			oos.writeObject(chunkservers);
-			oos.writeObject(chunkserverQueue);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+//		FileOutputStream fos;
+//		ObjectOutputStream oos;
+//		try {
+//			fos = new FileOutputStream(stateFile);
+//			oos = new ObjectOutputStream(fos);
+//			oos.writeObject(namespace);
+//			oos.writeObject(chunkLists);
+//			oos.writeObject(chunkLocations);
+//			oos.writeObject(remainingChunkSpace);
+//			oos.writeObject(chunkservers);
+//			oos.writeObject(chunkserverQueue);
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
 	}
 	
 	private void loadState() throws IOException, ClassNotFoundException
 	{
+		throw new IOException();
+		/*
 		FileInputStream fis;
 		ObjectInputStream ois;
 		fis = new FileInputStream(stateFile);
@@ -1136,6 +1167,7 @@ public class Master implements Serializable, Runnable{
 		remainingChunkSpace = (HashMap<String, Integer>) ois.readObject();
 		chunkservers = (HashMap<String, Socket>) ois.readObject();
 		chunkserverQueue = (ArrayDeque<String>) ois.readObject();
+		*/
 	}
 
 	public static void main(String[] args) {
