@@ -74,14 +74,15 @@ public class ChunkServer implements ChunkServerInterface {
 		try {
 			masterSocket = new Socket(Master.HOST, Master.PORT);
 			DataOutputStream out = new DataOutputStream(new BufferedOutputStream(masterSocket.getOutputStream()));
-			//byte[] host = InetAddress.getLocalHost().getHostAddress().getBytes();
-			String host = "localhost";
-			out.writeInt(12 + host.length());
+			byte[] host = InetAddress.getLocalHost().getHostAddress().getBytes();
+			//String host = "localhost";
+			out.writeInt(12 + host.length);
 			out.writeInt(Master.REGISTER_CHUNKSERVER_CMD);
-			out.writeInt(host.length());
-			out.writeBytes(host);
+			out.writeInt(host.length);
+			out.write(host);
 			out.writeInt(SERVER_PORT);
 			out.flush();
+			System.out.println("Connected to master");
 		} catch (IOException e) {
 			e.printStackTrace();
 		} finally {
