@@ -553,7 +553,7 @@ public class ClientRec {
 			//+1 for the dirty byte
 			//+1 to go to the next metadata
 			offsetToRead += currentLength + 5;
-			System.out.println("Current offset: " + currentOffset);
+//			System.out.println("Current offset: " + currentOffset);
 			if(offsetToRead == offset){
 				break;
 			}
