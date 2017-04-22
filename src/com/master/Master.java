@@ -434,7 +434,7 @@ public class Master implements Serializable, Runnable{
 			offset = ChunkServer.ChunkSize - remainingSpace;
 			System.out.println("Offset in Master: GetHandleForAppend: " + offset + "  inside if");
 			ArrayList<String> list = chunkLists.get(FileHandle);
-			remainingChunkSpace.put(FileHandle, remainingSpace - payloadSize - 3); //-3 for metadata
+			remainingChunkSpace.put(FileHandle, remainingSpace - payloadSize - 5); //-3 for metadata
 			saveState();
 			return list.get(list.size() - 1) + ":" + offset;
 		}
@@ -462,7 +462,7 @@ public class Master implements Serializable, Runnable{
 				chunkLists.get(FileHandle).add(chunkHandle); // add the handle to the list for this file
 				offset = 0;
 				System.out.println("Offset in Master: GetHandleForAppend: " + offset + "  inside else");
-				remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize - 3); //-3 for metadata // reset the remaining space to be chunksize - payloadsize
+				remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize - 5); //-3 for metadata // reset the remaining space to be chunksize - payloadsize
 				return chunkHandle + ":" + offset;
 			} catch (IOException e) {
 				e.printStackTrace();

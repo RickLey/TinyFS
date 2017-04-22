@@ -54,8 +54,8 @@ public class ClientRec {
 		*/
 		
 		//Check length of the payload with the chunk size
-		short length = (short) payload.length;
-		if(length+3 > ChunkServer.ChunkSize){ //+3 because of metadata
+		int length = payload.length;
+		if(length+5 > ChunkServer.ChunkSize){ //+3 because of metadata
 			System.out.println("Record too long");
 			return ClientFS.FSReturnVals.RecordTooLong;
 		}
@@ -75,7 +75,7 @@ public class ClientRec {
 			//Write command
 			mOut.writeInt(Master.GET_HANDLE_FOR_APPEND_CMD);
 			mOut.flush();
-			mOut.writeInt(payload.length);
+			mOut.writeInt(length);
 			mOut.writeInt(ofh.filename.length());
 			mOut.writeBytes(ofh.filename);
 			mOut.flush();
@@ -98,7 +98,7 @@ public class ClientRec {
 		}
 		*/
 		// Write the length of the record (2 bytes) right before the record itself	
-		if(!client.writeChunk(chunkHandle, ByteBuffer.allocate(2).putShort(length).array(), offset)){
+		if(!client.writeChunk(chunkHandle, ByteBuffer.allocate(4).putInt(length).array(), offset)){
 			return ClientFS.FSReturnVals.Fail;
 		}
 		/*
@@ -108,7 +108,7 @@ public class ClientRec {
 		}
 		*/
 		// Write dirty byte
-		if(!client.writeChunk(chunkHandle, ByteBuffer.allocate(1).put((byte)1).array(), offset+2)){
+		if(!client.writeChunk(chunkHandle, ByteBuffer.allocate(1).put((byte)1).array(), offset+4)){
 			return ClientFS.FSReturnVals.Fail;
 		}		
 		
@@ -119,7 +119,7 @@ public class ClientRec {
 		}
 		*/
 		// Write data
-		if(!client.writeChunk(chunkHandle, payload, offset+3)){
+		if(!client.writeChunk(chunkHandle, payload, offset+5)){
 			return ClientFS.FSReturnVals.Fail;
 		}
 		
@@ -159,7 +159,7 @@ public class ClientRec {
 
 		ConnectToChunkServer(chunkHandle);
 		
-		if(!client.writeChunk(chunkHandle, ByteBuffer.allocate(1).put((byte) 0).array(), offset+2)){
+		if(!client.writeChunk(chunkHandle, ByteBuffer.allocate(1).put((byte) 0).array(), offset+4)){
 			return ClientFS.FSReturnVals.Fail;
 		}
 		
@@ -215,23 +215,23 @@ public class ClientRec {
 		while(true){
 			//Read the first 2 bytes to determine how long the record is and update offset
 			//byte[] length = master.chunkserver.readChunk(chunkHandle, offset, 2);
-			byte[] length = client.readChunk(chunkHandle, offset, 2);
+			byte[] length = client.readChunk(chunkHandle, offset, 4);
 			
 			if(length == null){
 				return ClientFS.FSReturnVals.RecDoesNotExist;
 			}
 			
+			len = ByteBuffer.wrap(length).getInt();
+			
 			// Read 1 byte at offset 2 to get dirty byte and update offset
 			//byte[] dirty = master.chunkserver.readChunk(chunkHandle, offset, 1);
-			byte[] valid = client.readChunk(chunkHandle, offset+2, 1);
-			
+			byte[] valid = client.readChunk(chunkHandle, offset+4, 1);
 			
 			int validbyte = ByteBuffer.wrap(valid).get();
-			len = ByteBuffer.wrap(length).getShort();
 
 			if(validbyte == 0){
 				//If dirtybyte is invalid, update offset for next read
-				offset += len+3; // +3 for metadata
+				offset += len+5; // +5 for metadata
 			} else {
 				// Else break from the while loop
 				break;
@@ -240,7 +240,7 @@ public class ClientRec {
 		
 		// Exit while loop, thus we read chunk at offset for len number of bytes
 		//byte[] payload = master.chunkserver.readChunk(chunkHandle, offset, len);
-		byte[] payload = client.readChunk(chunkHandle, offset+3, len);
+		byte[] payload = client.readChunk(chunkHandle, offset+5, len);
 		
 		//Populate rec
 		rec.setPayload(payload);
@@ -298,17 +298,17 @@ public class ClientRec {
 			//Read after the length of the data to access next metadata.
 			//Always read 2 bytes because that is the length 
 			//byte[] length = master.chunkserver.readChunk(chunkHandle, offsetToRead, 2);
-			byte[]length = client.readChunk(chunkHandle, offsetToRead, 2);
+			byte[]length = client.readChunk(chunkHandle, offsetToRead, 4);
 			
 			if(length == null){
 				//read fails so we are at last record
 				break;
 			}
 			
-			currentLength = ByteBuffer.wrap(length).getShort();
+			currentLength = ByteBuffer.wrap(length).getInt();
 			// Read valid
 			//byte[] dirty = master.chunkserver.readChunk(chunkHandle, offsetToRead+2, 1);
-			byte[] valid = client.readChunk(chunkHandle, offsetToRead+2, 1);
+			byte[] valid = client.readChunk(chunkHandle, offsetToRead+4, 1);
 			
 			int validbyte = ByteBuffer.wrap(valid).get();
 			
@@ -329,14 +329,14 @@ public class ClientRec {
 
 			//+1 for the dirty byte
 			//+1 to go to the next metadata
-			offsetToRead += currentLength + 3;
+			offsetToRead += currentLength + 5;
 		}
 		
 		//out of while loop means read fail, thus currentOffset has the last valid record
 		//read at current offset witht he length provided by that offset
 		//+1 because of the dirty byte
 		//byte[] payload = master.chunkserver.readChunk(chunkHandle, currentOffset, currentLength);
-		byte[] payload = client.readChunk(chunkHandle, currentOffset+3, currlength);
+		byte[] payload = client.readChunk(chunkHandle, currentOffset+5, currlength);
 		
 		//Populate rec
 		rec.setPayload(payload);
@@ -375,12 +375,12 @@ public class ClientRec {
 		
 		//get length of the current to up
 		//byte[] length = master.chunkserver.readChunk(chunkHandle, offset, 2);
-		byte[] length = client.readChunk(chunkHandle, offset, 2);
+		byte[] length = client.readChunk(chunkHandle, offset, 4);
 		
-		int len = ByteBuffer.wrap(length).getShort();
+		int len = ByteBuffer.wrap(length).getInt();
 		
 		// update offset with it
-		offset += len+3; //+3 because of metadata
+		offset += len+5; //+3 because of metadata
 		
 		//start reading at next offset, we need to check if the next is valid,
 		//if not, we need to keep reading
@@ -388,7 +388,7 @@ public class ClientRec {
 		while(true){
 			//get length of the current
 			//length = master.chunkserver.readChunk(chunkHandle, offset, 2);
-			length = client.readChunk(chunkHandle, offset, 2);
+			length = client.readChunk(chunkHandle, offset, 4);
 			
 			if(length == null){
 				//this record is the last record in the chunk, thus
@@ -423,27 +423,28 @@ public class ClientRec {
 				offset = 0;
 				//we read again
 				//length = master.chunkserver.readChunk(chunkHandle, offset, 2);
-				length = client.readChunk(chunkHandle, offset, 2);
+				length = client.readChunk(chunkHandle, offset, 4);
 			}
-			len = ByteBuffer.wrap(length).getShort();
+			len = ByteBuffer.wrap(length).getInt();
 
 			//byte[] dirty = master.chunkserver.readChunk(chunkHandle, offset+2, 1);
-			byte[] valid = client.readChunk(chunkHandle, offset+2, 1);
+			byte[] valid = client.readChunk(chunkHandle, offset+4, 1);
 			
 			short validbyte = ByteBuffer.wrap(valid).get();
 			
 			if(validbyte == 1){
 				//this record is good
+				//offset += 5;
 				break;
 			} else{
 				//update offset for next read
-				offset += len+3;
+				offset += len+5;
 			}
 		}
 
 		//read len number of bytes at offset. Both len and offset are updated above
 		//byte[] data = master.chunkserver.readChunk(chunkHandle, offset, len);
-		byte[] payload = client.readChunk(chunkHandle, offset, len);
+		byte[] payload = client.readChunk(chunkHandle, offset+5, len);
 		
 		//populate rec
 		RID r = new RID();
@@ -520,17 +521,17 @@ public class ClientRec {
 			//Read after the length of the data to access next metadata.
 			//Always read 2 bytes because that is the length 
 			//byte[] length = master.chunkserver.readChunk(chunkHandle, offsetToRead, 2);
-			byte[]length = client.readChunk(chunkHandle, offsetToRead, 2);
+			byte[]length = client.readChunk(chunkHandle, offsetToRead, 4);
 			
 			if(length == null){
 				//read fails so we are at last record
 				break;
 			}
 			
-			currentLength = ByteBuffer.wrap(length).getShort();
+			currentLength = ByteBuffer.wrap(length).getInt();
 			// Read valid
 			//byte[] dirty = master.chunkserver.readChunk(chunkHandle, offsetToRead+2, 1);
-			byte[] valid = client.readChunk(chunkHandle, offsetToRead+2, 1);
+			byte[] valid = client.readChunk(chunkHandle, offsetToRead+4, 1);
 			
 			int validbyte = ByteBuffer.wrap(valid).get();
 			
@@ -551,7 +552,7 @@ public class ClientRec {
 
 			//+1 for the dirty byte
 			//+1 to go to the next metadata
-			offsetToRead += currentLength + 3;
+			offsetToRead += currentLength + 5;
 			System.out.println("Current offset: " + currentOffset);
 			if(offsetToRead == offset){
 				break;
@@ -560,7 +561,7 @@ public class ClientRec {
 		
 		//exit while loop means current offset has the previous record of length currentLength
 		//byte[] payload = master.chunkserver.readChunk(chunkHandle, currentOffset, currentLength);
-		byte[] payload = client.readChunk(chunkHandle, currentOffset+3, currlength);
+		byte[] payload = client.readChunk(chunkHandle, currentOffset+5, currlength);
 		
 		if(payload == null || payload.length == 0){
 			return ClientFS.FSReturnVals.Success;
@@ -588,17 +589,17 @@ public class ClientRec {
 			//Read after the length of the data to access next metadata.
 			//Always read 2 bytes because that is the length 
 			//byte[] length = master.chunkserver.readChunk(chunkHandle, offsetToRead, 2);
-			byte[]length = client.readChunk(chunkHandle, offsetToRead, 2);
+			byte[]length = client.readChunk(chunkHandle, offsetToRead, 4);
 			
 			if(length == null){
 				//read fails so we are at last record
 				break;
 			}
 			
-			currentLength = ByteBuffer.wrap(length).getShort();
+			currentLength = ByteBuffer.wrap(length).getInt();
 			// Read valid
 			//byte[] dirty = master.chunkserver.readChunk(chunkHandle, offsetToRead+2, 1);
-			byte[] valid = client.readChunk(chunkHandle, offsetToRead+2, 1);
+			byte[] valid = client.readChunk(chunkHandle, offsetToRead+4, 1);
 			
 			int validbyte = ByteBuffer.wrap(valid).get();
 			
@@ -620,14 +621,14 @@ public class ClientRec {
 
 			//+1 for the dirty byte
 			//+1 to go to the next metadata
-			offsetToRead += currentLength + 3;
+			offsetToRead += currentLength + 5;
 		}
 		
 		//out of while loop means read fail, thus currentOffset has the last valid record
 		//read at current offset witht he length provided by that offset
 		//+1 because of the dirty byte
 		//byte[] payload = master.chunkserver.readChunk(chunkHandle, currentOffset, currentLength);
-		byte[] payload = client.readChunk(chunkHandle, currentOffset+3, currlength);
+		byte[] payload = client.readChunk(chunkHandle, currentOffset+5, currlength);
 		
 		//populate rec
 		r.chunkHandle = chunkHandle;
