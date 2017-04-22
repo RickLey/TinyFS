@@ -141,7 +141,7 @@ public class ChunkServer implements ChunkServerInterface {
 			return null;
 		}
 	}
-	
+
 	private static class RequestProcessor implements Runnable {
 		private ChunkServer cs = null;
 		private Socket socket = null;
@@ -160,8 +160,7 @@ public class ChunkServer implements ChunkServerInterface {
 		}
 
 		public void run() {
-			//Socket ClientConnection = null;  //A client's connection to the server
-
+			Socket ClientConnection = null;  //A client's connection to the server
 			try {
 				//Use the existing input and output stream as long as the client is connected
 				while (!socket.isClosed()) {
@@ -237,9 +236,10 @@ public class ChunkServer implements ChunkServerInterface {
 			}
 		}
 	}
+	
 
-	public static void main(String args[])
-	{
+
+	public static void main(String args[]) {
 		ChunkServer cs = new ChunkServer();
 
 		int ServerPort = 0; //Set to 0 to cause ServerSocket to allocate the port
