@@ -434,6 +434,7 @@ public class ClientRec {
 			
 			if(validbyte == 1){
 				//this record is good
+				//offset += 5;
 				break;
 			} else{
 				//update offset for next read
@@ -443,7 +444,7 @@ public class ClientRec {
 
 		//read len number of bytes at offset. Both len and offset are updated above
 		//byte[] data = master.chunkserver.readChunk(chunkHandle, offset, len);
-		byte[] payload = client.readChunk(chunkHandle, offset, len);
+		byte[] payload = client.readChunk(chunkHandle, offset+5, len);
 		
 		//populate rec
 		RID r = new RID();

@@ -9,7 +9,7 @@ import java.io.File;
  */
 public interface ChunkServerInterface {
 
-	public static final int ChunkSize = 4 * 1024; //4 KB chunk sizes
+	public static final int ChunkSize = 1024 * 1024; //4 KB chunk sizes
 	
 	/**
 	 * Return the chunkhandle for a newly created chunk.
