@@ -1137,27 +1137,24 @@ public class Master implements Serializable, Runnable{
 	
 	private void saveState()
 	{
-//		FileOutputStream fos;
-//		ObjectOutputStream oos;
-//		try {
-//			fos = new FileOutputStream(stateFile);
-//			oos = new ObjectOutputStream(fos);
-//			oos.writeObject(namespace);
-//			oos.writeObject(chunkLists);
-//			oos.writeObject(chunkLocations);
-//			oos.writeObject(remainingChunkSpace);
-//			oos.writeObject(chunkservers);
-//			oos.writeObject(chunkserverQueue);
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
+		FileOutputStream fos;
+		ObjectOutputStream oos;
+		try {
+			fos = new FileOutputStream(stateFile);
+			oos = new ObjectOutputStream(fos);
+			oos.writeObject(namespace);
+			oos.writeObject(chunkLists);
+			oos.writeObject(chunkLocations);
+			oos.writeObject(remainingChunkSpace);
+			oos.writeObject(chunkserverQueue);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 	
 	private void loadState() throws IOException, ClassNotFoundException
-	{
-		throw new IOException();
-		/*
+	{		
 		FileInputStream fis;
 		ObjectInputStream ois;
 		fis = new FileInputStream(stateFile);
@@ -1166,9 +1163,8 @@ public class Master implements Serializable, Runnable{
 		chunkLists = (HashMap<String, ArrayList<String>>) ois.readObject();
 		chunkLocations = (HashMap<String, String>) ois.readObject();
 		remainingChunkSpace = (HashMap<String, Integer>) ois.readObject();
-		chunkservers = (HashMap<String, Socket>) ois.readObject();
 		chunkserverQueue = (ArrayDeque<String>) ois.readObject();
-		*/
+		
 	}
 
 	public static void main(String[] args) {
