@@ -84,8 +84,10 @@ public class ClientFS {
 			out.write(dirnameBytes);
 			out.flush();
 
+			System.out.println("Waiting for response");
 			int inPacketSize = in.readInt();
 			int retValue = in.readInt();
+			System.out.println("Received response");
 			return FSReturnVals.valueOf(retValue);
 		} catch (IOException e) {
 			e.printStackTrace();

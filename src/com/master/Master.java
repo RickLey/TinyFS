@@ -28,9 +28,6 @@ public class Master implements Serializable, Runnable{
 
 	public static int PORT = 1234;
 	public static String HOST = "localhost";
-	
-	public int server_port = 8081;
-	public String server_host = "localhost";
 
 	public static final int CREATE_DIR_CMD = 101;
 	public static final int DELETE_DIR_CMD = 102;
@@ -105,12 +102,14 @@ public class Master implements Serializable, Runnable{
 		int parentIndex = namespace.indexOf(src);
 		if(parentIndex < 0)
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.SrcDirNotExistent;
 		}
 		
 		String fullPath = src + dirname + "/";
 		if(namespace.indexOf(fullPath) >= 0)
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.DestDirExists;
 		}
 		
@@ -142,6 +141,7 @@ public class Master implements Serializable, Runnable{
 		int parentIndex = namespace.indexOf(src);
 		if(parentIndex < 0)
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.SrcDirNotExistent;
 		}
 		
@@ -149,11 +149,13 @@ public class Master implements Serializable, Runnable{
 		int dirIndex = namespace.indexOf(fullPath);
 		if(dirIndex < 0)
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.Fail; // Dir doesn't exist
 		}
 		
 		if(namespace.get(dirIndex + 1).startsWith(fullPath))
 		{
+			namespaceLock.unlock();
 			return ClientFS.FSReturnVals.DirNotEmpty;
 		}
 		
@@ -445,10 +447,7 @@ public class Master implements Serializable, Runnable{
 			ObjectInputStream in = null;
 			try {
 				String host = nextChunkserver();
-				//Socket socket = chunkservers.get(host);
-				
-				s = new Socket(server_host, server_port);
-				//Socket s = new Socket("localhost", 8081);
+				s = new Socket(host, chunkServers.get(host));
 				out = new ObjectOutputStream(s.getOutputStream());
 				in = new ObjectInputStream(s.getInputStream());
 
@@ -463,6 +462,8 @@ public class Master implements Serializable, Runnable{
 				offset = 0;
 				System.out.println("Offset in Master: GetHandleForAppend: " + offset + "  inside else");
 				remainingChunkSpace.put(FileHandle, ChunkServer.ChunkSize - payloadSize - 5); //-3 for metadata // reset the remaining space to be chunksize - payloadsize
+
+				s.close();
 				return chunkHandle + ":" + offset;
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -769,30 +770,26 @@ public class Master implements Serializable, Runnable{
 		int handleSize = in.readInt();
 		String handle = readString(in, handleSize);
 
-		//String host = GetLocationForChunk(handle);
-		/*
-		System.out.println("HOST: " + host);
+		String host = GetLocationForChunk(handle);
 		if (host == null) {
 			out.writeInt(4);
 			out.flush();
 			return;
 		}
 
-		Socket socket = chunkservers.get(host);
-		if (socket == null) {
+		Integer port = chunkServers.get(host);
+		if (port == null) {
 			out.writeInt(4);
 			out.flush();
 			return;
 		}
-		 */
-		//byte[] hostBytes = host.getBytes();
-		out.writeInt(12 + server_host.length());
-		out.writeInt(server_host.length()); //TODO: Change to container
-		out.writeBytes(server_host); //TODO: Change to container
+
+		byte[] hostBytes = host.getBytes();
+		out.writeInt(12 + hostBytes.length);
+		out.writeInt(hostBytes.length);
+		out.write(hostBytes);
 		
-		//System.out.println("PORT: " + socket.getPort());
-		
-		out.writeInt(server_port); //TODO: Change to container
+		out.writeInt(port);
 		
 		System.out.println("Server location sent");
 	}
@@ -817,9 +814,6 @@ public class Master implements Serializable, Runnable{
 		
 		chunkservers.put(host, socket);
 		chunkServers.put(host, port);
-		
-		server_host = host;
-		server_port = port;
 		
 		chunkserverQueue.addLast(host);
 	}
