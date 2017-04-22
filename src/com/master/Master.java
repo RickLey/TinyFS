@@ -424,8 +424,9 @@ public class Master implements Serializable, Runnable{
 		return list.size() > 0 ? list.get(0) : null;
 	}
 	
-	public String GetHandleForAppend(String FileHandle, short payloadSize, int offset){
+	public String GetHandleForAppend(String FileHandle, int payloadSize, int offset){
 		int remainingSpace = remainingChunkSpace.get(FileHandle);
+		//System.out.println("Remaining space: " + remainingSpace);
 		System.out.println("Remaining space: " + remainingSpace);
 		System.out.println("Payload size: " + payloadSize);
 		if(payloadSize < remainingSpace)
@@ -867,7 +868,7 @@ public class Master implements Serializable, Runnable{
 		int filehandleSize = in.readInt();
 		String filehandle = readString(in, filehandleSize);
 		int offset = 0;
-		String chunkHandleANDoffset = GetHandleForAppend(filehandle, (short) payloadSize, offset);
+		String chunkHandleANDoffset = GetHandleForAppend(filehandle, payloadSize, offset);
 		if (chunkHandleANDoffset == null) {
 			out.writeInt(4);
 			return;
